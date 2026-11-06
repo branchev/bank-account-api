@@ -83,3 +83,37 @@ docker compose ps
 ```
 
 PostgreSQL is accessible locally at `127.0.0.1:5433` by default.
+
+### Database Migrations
+
+Database schema changes are managed using [Goose](https://github.com/pressly/goose).
+
+After starting PostgreSQL, load the environment variables:
+
+```bash
+set -a
+source .env
+set +a
+```
+
+Apply all pending migrations:
+
+```bash
+goose -dir migrations postgres "$DATABASE_URL" up
+```
+
+Check migration status:
+
+```bash
+goose -dir migrations postgres "$DATABASE_URL" status
+```
+
+To roll back the most recently applied migration:
+
+```bash
+goose -dir migrations postgres "$DATABASE_URL" down
+```
+
+Migrations are versioned and tracked in PostgreSQL through the `goose_db_version` table. Running `up` multiple times is safe: already applied migrations are skipped.
+
+**Note:** Rolling back migrations can delete data. The `down` command is intended for controlled development use and should not be executed against production without reviewing the migration.
