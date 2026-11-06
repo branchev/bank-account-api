@@ -117,3 +117,39 @@ goose -dir migrations postgres "$DATABASE_URL" down
 Migrations are versioned and tracked in PostgreSQL through the `goose_db_version` table. Running `up` multiple times is safe: already applied migrations are skipped.
 
 **Note:** Rolling back migrations can delete data. The `down` command is intended for controlled development use and should not be executed against production without reviewing the migration.
+
+### Running the API
+
+Ensure PostgreSQL is running and the database migrations have been applied.
+
+Load the environment variables if they are not already available in your terminal:
+
+```bash
+set -a
+source .env
+set +a
+```
+
+Start the Go API:
+
+```bash
+go run ./cmd/api
+```
+
+The application connects to PostgreSQL using `DATABASE_URL` and starts an HTTP server on the port specified by `APP_PORT` (default: `8080`).
+
+Verify that the HTTP server is running:
+
+```bash
+curl -i http://localhost:8080/health
+```
+
+Expected response:
+
+```text
+HTTP/1.1 200 OK
+
+OK
+```
+
+The `/health` endpoint currently checks HTTP server availability. Database connectivity is verified during application startup.
