@@ -39,3 +39,47 @@ The architecture and financial integrity requirements are being established. Imp
 ## Running the Application
 
 Instructions will be added once the application is implemented.
+
+## Prerequisites
+
+The following tools are required for local development:
+
+- **Go** — application development and testing
+- **Docker & Docker Compose** — PostgreSQL container
+- **Goose v3** — database schema migrations
+
+### Install Goose
+
+```bash
+go install github.com/pressly/goose/v3/cmd/goose@v3.29.0
+```
+
+Verify the installation:
+
+```bash
+goose -version
+```
+
+### Environment Configuration
+
+Create a local environment file:
+
+```bash
+cp .env.example .env
+```
+
+The `.env.example` file documents the required environment variables. The `.env` file is excluded from version control.
+
+### Start PostgreSQL
+
+```bash
+docker compose up -d
+```
+
+Verify that PostgreSQL is running:
+
+```bash
+docker compose ps
+```
+
+PostgreSQL is accessible locally at `127.0.0.1:5433` by default.
