@@ -14,6 +14,8 @@ servers:
 tags:
     - name: Health
       description: Application health checks
+    - name: Accounts
+      description: Bank account management
 paths:
     /health:
         get:
@@ -29,3 +31,80 @@ paths:
                             schema:
                                 type: string
                                 example: OK
+    /api/v1/accounts:
+        post:
+            tags:
+                - Accounts
+            summary: Create a bank account
+            description: |
+                Creates a new EUR bank account.
+
+                The initial balance defaults to zero when omitted.
+                A positive initial balance is funded through the internal
+                system account and recorded in the double-entry ledger.
+
+                The operation is atomic and idempotent.
+            operationId: createAccount
+            parameters:
+                - name: Idempotency-Key
+                  in: header
+                  required: true
+                  description: |
+                    Unique key identifying the account creation request.
+                    Repeating the same request with the same key returns
+                    the original result without creating another account.
+                  schema:
+                    type: string
+                    minLength: 1
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            description: Request payload for creating a bank account.
+                            properties:
+                                initial_balance_cents:
+                                    type: integer
+                                    format: int64
+                                    minimum: 0
+                                    default: 0
+                                    example: 10000
+                                    description: |
+                                        Initial account balance in euro cents.
+                                        Defaults to zero when omitted.
+                            additionalProperties: false
+            responses:
+                '201':
+                    description: Bank account created successfully.
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                description: A bank account with its current balance.
+                                required:
+                                    - id
+                                    - currency
+                                    - balance_cents
+                                properties:
+                                    id:
+                                        type: integer
+                                        format: int64
+                                        example: 2
+                                        description: Unique account identifier.
+                                    currency:
+                                        type: string
+                                        enum:
+                                            - EUR
+                                        example: EUR
+                                        description: Account currency.
+                                    balance_cents:
+                                        type: integer
+                                        format: int64
+                                        minimum: 0
+                                        example: 10000
+                                        description: Current account balance in euro cents.
+                '400':
+                    description: Invalid request payload or missing Idempotency-Key.
+                '409':
+                    description: Idempotency-Key reused with a different request.

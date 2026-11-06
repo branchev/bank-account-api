@@ -1,0 +1,14 @@
+
+type: object
+description: Request payload for creating a bank account.
+properties:
+  initial_balance_cents:
+    type: integer
+    format: int64
+    minimum: 0
+    default: 0
+    example: 10000
+    description: |
+      Initial account balance in euro cents.
+      Defaults to zero when omitted.
+additionalProperties: false

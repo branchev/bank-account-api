@@ -1,0 +1,25 @@
+
+type: object
+description: A bank account with its current balance.
+required:
+  - id
+  - currency
+  - balance_cents
+properties:
+  id:
+    type: integer
+    format: int64
+    example: 2
+    description: Unique account identifier.
+  currency:
+    type: string
+    enum:
+      - EUR
+    example: EUR
+    description: Account currency.
+  balance_cents:
+    type: integer
+    format: int64
+    minimum: 0
+    example: 10000
+    description: Current account balance in euro cents.

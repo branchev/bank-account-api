@@ -1,3 +1,4 @@
+
 openapi: 3.0.3
 
 info:
@@ -17,7 +18,12 @@ servers:
 tags:
   - name: Health
     description: Application health checks
+  - name: Accounts
+    description: Bank account management
 
 paths:
   /health:
     $ref: "./paths/health.yaml"
+
+  /api/v1/accounts:
+    $ref: "./paths/accounts.yaml"

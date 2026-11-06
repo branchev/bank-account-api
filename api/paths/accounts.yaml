@@ -1,0 +1,47 @@
+
+post:
+  tags:
+    - Accounts
+  summary: Create a bank account
+  description: |
+    Creates a new EUR bank account.
+
+    The initial balance defaults to zero when omitted.
+    A positive initial balance is funded through the internal
+    system account and recorded in the double-entry ledger.
+
+    The operation is atomic and idempotent.
+  operationId: createAccount
+
+  parameters:
+    - name: Idempotency-Key
+      in: header
+      required: true
+      description: |
+        Unique key identifying the account creation request.
+        Repeating the same request with the same key returns
+        the original result without creating another account.
+      schema:
+        type: string
+        minLength: 1
+
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: "../schemas/create_account_request.yaml"
+
+  responses:
+    '201':
+      description: Bank account created successfully.
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/account.yaml"
+
+    '400':
+      description: Invalid request payload or missing Idempotency-Key.
+
+    '409':
+      description: Idempotency-Key reused with a different request.
