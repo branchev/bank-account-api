@@ -1,0 +1,17 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Go binaries and test artifacts
+/bin/
+*.test
+*.out
+coverage.html
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
