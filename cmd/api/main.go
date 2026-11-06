@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/branchev/bank-account-api/api"
 	"github.com/branchev/bank-account-api/internal/platform/database"
 )
 
@@ -34,11 +35,17 @@ func main() {
 	log.Println("Connected to PostgreSQL")
 
 	mux := http.NewServeMux()
+	api.RegisterRoutes(mux)
 
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("OK"))
 	})
+
+	// mux.HandleFunc("GET /openapi.yaml", func(w http.ResponseWriter, r *http.Request) {
+	// 	w.Header().Set("Content-Type", "application/yaml")
+	// 	http.ServeFile(w, r, "api/openapi.yaml")
+	// })
 
 	port := os.Getenv("APP_PORT")
 	if port == "" {

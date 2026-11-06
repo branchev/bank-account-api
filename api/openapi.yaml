@@ -1,0 +1,36 @@
+
+openapi: 3.0.3
+
+info:
+  title: Bank Account API
+  version: 1.0.0
+  description: |
+    REST API for managing bank accounts and financial transactions.
+
+    The API follows a modular monolith architecture.
+    Financial operations will support atomicity, concurrency safety,
+    and idempotency.
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+tags:
+  - name: Health
+    description: Application health checks
+
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Check API availability
+      operationId: getHealth
+      responses:
+        '200':
+          description: API is running
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: OK
