@@ -26,7 +26,7 @@ Business domains are logically separated within a single application, allowing f
 - Consistent account balances.
 - Internal reconciliation and automated testing.
 - Reproducible local development using Docker Compose.
-- Versioned REST API with OpenAPI documentation.
+- Versioned REST API with modular OpenAPI documentation.
 
 ## Technology Stack
 
@@ -38,6 +38,7 @@ Business domains are logically separated within a single application, allowing f
 - **Go standard library** — HTTP server, routing, testing, and embedded files.
 - **OpenAPI 3.0.3** — API specification.
 - **Swagger UI** — interactive API documentation.
+- **vacuum** — OpenAPI specification bundling.
 
 ## Project Status
 
@@ -53,7 +54,9 @@ The following components are currently implemented:
 - Initial system funding account.
 - Database constraints and ledger immutability trigger.
 - `GET /health` endpoint.
-- Embedded OpenAPI specification.
+- Modular OpenAPI specification using external `$ref` references.
+- OpenAPI bundling with `vacuum`.
+- Embedded, standalone OpenAPI specification.
 - Swagger UI at `/swagger`.
 - Automated tests for documentation endpoints.
 
@@ -73,6 +76,7 @@ The design prioritizes financial correctness, maintainability, testability, and 
 | Resource naming | RESTful, plural nouns (e.g. `/accounts`, `/transfers`) |
 | Request/response format | JSON using `snake_case` field names |
 | API specification | OpenAPI 3.0.3 |
+| Specification organization | Modular YAML files with external `$ref` references |
 | Interactive documentation | Swagger UI at `/swagger` |
 | OpenAPI document | `/openapi.yaml` |
 | Health check | `/health` (outside the versioned API) |
@@ -124,6 +128,10 @@ bank-api/
 │   ├── handler.go
 │   ├── handler_test.go
 │   ├── openapi.yaml
+│   ├── openapi.bundle.yaml
+│   ├── paths/
+│   │   └── health.yaml
+│   ├── schemas/
 │   └── swagger/
 │       └── index.html
 ├── cmd/
@@ -138,6 +146,7 @@ bank-api/
 │       └── database/
 │           └── postgres.go
 ├── migrations/
+│   └── 20261106105043_init_schema.sql
 ├── docker-compose.yml
 ├── go.mod
 ├── go.sum
@@ -150,6 +159,10 @@ The `internal` directory contains application-specific business modules and infr
 
 The `cmd/reconcile` directory is reserved for the planned reconciliation command.
 
+The `api/paths` directory contains endpoint definitions, while `api/schemas` is reserved for reusable request, response, and domain schemas.
+
+The generated `api/openapi.bundle.yaml` file is embedded into the application and served to API documentation consumers.
+
 ## Prerequisites
 
 The following tools are required for local development:
@@ -157,6 +170,7 @@ The following tools are required for local development:
 - **Go** — application development and testing.
 - **Docker & Docker Compose** — PostgreSQL container.
 - **Goose v3** — database schema migrations.
+- **vacuum** — regenerating the OpenAPI bundle when the specification changes.
 
 ### Install Goose
 
@@ -167,8 +181,28 @@ go install github.com/pressly/goose/v3/cmd/goose@v3.29.0
 Verify the installation:
 
 ```bash
-goose -version
+$(go env GOPATH)/bin/goose -version
 ```
+
+Ensure `$(go env GOPATH)/bin` is included in your `PATH` if you want to invoke `goose` directly.
+
+### Install vacuum
+
+The project uses [vacuum](https://github.com/daveshanley/vacuum) to generate a standalone OpenAPI specification from modular YAML files.
+
+Install the tested version:
+
+```bash
+go install github.com/daveshanley/vacuum@v0.39.1
+```
+
+Verify the installation:
+
+```bash
+$(go env GOPATH)/bin/vacuum version
+```
+
+The OpenAPI bundle is committed to the repository, so installing `vacuum` is only necessary when modifying or regenerating the API specification.
 
 ## Running the Application
 
@@ -276,13 +310,77 @@ The `/health` endpoint currently checks HTTP server availability. Database conne
 
 The API uses **OpenAPI 3.0.3** for its specification and **Swagger UI** for interactive documentation.
 
+The specification follows an **OpenAPI-first, modular approach**, separating endpoint definitions and reusable schemas into dedicated YAML files.
+
 Once the application is running, the following endpoints are available:
 
 | Endpoint | Description |
 |---|---|
 | `http://localhost:8080/swagger` | Interactive Swagger UI |
-| `http://localhost:8080/openapi.yaml` | OpenAPI specification |
+| `http://localhost:8080/openapi.yaml` | Bundled OpenAPI specification |
 | `http://localhost:8080/health` | Application health check |
+
+### Modular OpenAPI Structure
+
+The OpenAPI source files are organized as follows:
+
+```text
+api/
+├── openapi.yaml          # Root OpenAPI specification
+├── openapi.bundle.yaml   # Generated standalone specification
+├── paths/                # Endpoint definitions
+│   └── health.yaml
+├── schemas/              # Reusable schemas
+└── swagger/
+    └── index.html
+```
+
+The root `api/openapi.yaml` file defines the API metadata, servers, tags, and paths.
+
+Individual endpoint definitions are maintained in `api/paths/` and referenced from the root specification using external `$ref` references.
+
+For example:
+
+```yaml
+paths:
+  /health:
+    $ref: "./paths/health.yaml"
+```
+
+This approach keeps the API contract modular and avoids maintaining a single large YAML document as the number of endpoints grows.
+
+### OpenAPI Bundling
+
+Swagger UI consumes a standalone OpenAPI document generated from the modular source files.
+
+The project uses `vacuum` to resolve external references and produce `api/openapi.bundle.yaml`.
+
+From the project root, run:
+
+```bash
+$(go env GOPATH)/bin/vacuum bundle \
+  --base ./api \
+  api/openapi.yaml \
+  api/openapi.bundle.yaml
+```
+
+The `--base ./api` option is important because external references must be resolved relative to the `api` directory.
+
+For example, the following reference:
+
+```yaml
+$ref: "./paths/health.yaml"
+```
+
+is resolved to the corresponding file inside `api/paths/`.
+
+The generated document contains the resolved endpoint definitions and can be served independently of the original modular files.
+
+**Important:** Regenerate the bundle whenever any OpenAPI source file changes.
+
+The generated `api/openapi.bundle.yaml` file is committed to the repository because it is embedded into the Go application at compile time.
+
+The application does not require `vacuum` or the source YAML files at runtime.
 
 ### Swagger UI
 
@@ -296,7 +394,13 @@ The current specification documents the implemented `GET /health` endpoint. Busi
 
 ### Embedded Documentation
 
-The OpenAPI specification and Swagger UI HTML are embedded into the compiled Go binary using the standard library's `embed` package.
+The generated OpenAPI bundle and Swagger UI HTML are embedded into the compiled Go binary using the standard library's `embed` package.
+
+The source specification remains modular, while the application serves the generated bundle through:
+
+```text
+GET /openapi.yaml
+```
 
 This removes the runtime dependency on the application's working directory for these files.
 
@@ -325,6 +429,23 @@ The documentation tests verify that:
 
 Additional unit, integration, financial integrity, and concurrency tests will be introduced alongside the corresponding business functionality.
 
+### OpenAPI Validation
+
+The modular specification can be bundled using `vacuum`.
+
+After modifying the OpenAPI source files, regenerate the bundle:
+
+```bash
+$(go env GOPATH)/bin/vacuum bundle \
+  --base ./api \
+  api/openapi.yaml \
+  api/openapi.bundle.yaml
+```
+
+The generated document should contain resolved external references and remain compatible with Swagger UI.
+
+Automated checks for stale generated specifications and additional OpenAPI validation may be introduced as the project evolves.
+
 ## Planned API Endpoints
 
 The following business endpoints are planned for implementation:
@@ -340,6 +461,42 @@ These endpoints are not yet available.
 
 Financial write operations will use PostgreSQL transactions and idempotency controls to protect against duplicate execution and inconsistent balances.
 
+### Planned Account Creation Contract
+
+Account creation will support an optional initial balance expressed in integer cents.
+
+Example request:
+
+```http
+POST /api/v1/accounts
+Content-Type: application/json
+Idempotency-Key: create-account-001
+```
+
+```json
+{
+  "initial_balance_cents": 10000
+}
+```
+
+Example successful response:
+
+```json
+{
+  "id": 2,
+  "currency": "EUR",
+  "balance_cents": 10000
+}
+```
+
+The initial balance defaults to zero when omitted.
+
+Positive initial balances will be funded through the internal system account and recorded through the double-entry ledger.
+
+The operation will be designed to support idempotent retries, with the account creation and any initial funding performed atomically.
+
+**Note:** This contract describes planned functionality and is not yet implemented.
+
 ## Development Approach
 
 The project is developed incrementally, with each completed feature including:
@@ -348,6 +505,7 @@ The project is developed incrementally, with each completed feature including:
 - Business logic and persistence implementation.
 - Appropriate automated tests.
 - OpenAPI specification updates.
+- Regeneration of the OpenAPI bundle.
 - README updates.
 - A focused Git commit.
 

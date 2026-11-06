@@ -1,4 +1,3 @@
-
 openapi: 3.0.3
 
 info:
@@ -21,16 +20,4 @@ tags:
 
 paths:
   /health:
-    get:
-      tags:
-        - Health
-      summary: Check API availability
-      operationId: getHealth
-      responses:
-        '200':
-          description: API is running
-          content:
-            text/plain:
-              schema:
-                type: string
-                example: OK
+    $ref: "./paths/health.yaml"

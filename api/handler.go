@@ -5,7 +5,7 @@ import (
 	"net/http"
 )
 
-//go:embed openapi.yaml swagger/index.html
+//go:embed openapi.bundle.yaml swagger/index.html
 var documentation embed.FS
 
 func RegisterRoutes(mux *http.ServeMux) {
@@ -15,7 +15,7 @@ func RegisterRoutes(mux *http.ServeMux) {
 
 func serveOpenAPI(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/yaml")
-	http.ServeFileFS(w, r, documentation, "openapi.yaml")
+	http.ServeFileFS(w, r, documentation, "openapi.bundle.yaml")
 }
 
 func serveSwaggerUI(w http.ResponseWriter, r *http.Request) {
