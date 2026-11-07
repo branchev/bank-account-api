@@ -22,6 +22,11 @@ type mockAccountService struct {
 		ctx context.Context,
 		id int64,
 	) (*Account, error)
+
+	depositFunc func(
+		ctx context.Context,
+		request DepositRequest,
+	) (DepositResult, error)
 }
 
 func (m *mockAccountService) CreateAccount(
@@ -40,6 +45,17 @@ func (m *mockAccountService) GetAccount(
 	}
 
 	return m.getAccountFunc(ctx, id)
+}
+
+func (m *mockAccountService) Deposit(
+	ctx context.Context,
+	request DepositRequest,
+) (DepositResult, error) {
+	if m.depositFunc == nil {
+		return DepositResult{}, errors.New("Deposit is not configured in this mock")
+	}
+
+	return m.depositFunc(ctx, request)
 }
 
 // Compile-time check that the mock implements the Service interface.

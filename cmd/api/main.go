@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/http"
 	"os"
@@ -10,7 +11,10 @@ import (
 	"time"
 
 	"github.com/branchev/bank-account-api/api"
+	"github.com/branchev/bank-account-api/internal/account"
+	"github.com/branchev/bank-account-api/internal/ledger"
 	"github.com/branchev/bank-account-api/internal/platform/database"
+	"github.com/branchev/bank-account-api/internal/transaction"
 )
 
 func main() {
@@ -34,18 +38,32 @@ func main() {
 
 	log.Println("Connected to PostgreSQL")
 
+	// Initialize repositories.
+	accountRepository := account.NewPostgresRepository()
+	ledgerRepository := ledger.NewPostgresRepository()
+	transactionRepository := transaction.NewPostgresRepository()
+
+	// Initialize the account service.
+	accountService := account.NewPostgresService(
+		pool,
+		accountRepository,
+		ledgerRepository,
+		transactionRepository,
+	)
+
+	// Initialize the HTTP handler.
+	accountHandler := account.NewHTTPHandler(accountService)
+
+	// Register HTTP routes.
 	mux := http.NewServeMux()
+
 	api.RegisterRoutes(mux)
+	accountHandler.RegisterRoutes(mux)
 
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("OK"))
 	})
-
-	// mux.HandleFunc("GET /openapi.yaml", func(w http.ResponseWriter, r *http.Request) {
-	// 	w.Header().Set("Content-Type", "application/yaml")
-	// 	http.ServeFile(w, r, "api/openapi.yaml")
-	// })
 
 	port := os.Getenv("APP_PORT")
 	if port == "" {
@@ -62,7 +80,7 @@ func main() {
 		log.Printf("Bank API listening on port %s", port)
 
 		if err := server.ListenAndServe(); err != nil &&
-			err != http.ErrServerClosed {
+			!errors.Is(err, http.ErrServerClosed) {
 			log.Printf("HTTP server error: %v", err)
 			stop()
 		}

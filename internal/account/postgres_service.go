@@ -5,9 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"math"
 	"net/http"
 
 	"github.com/branchev/bank-account-api/internal/ledger"
@@ -153,7 +151,7 @@ func (s *PostgresService) fundInitialBalance(
 	account *Account,
 	amount int64,
 ) error {
-	// Find the system account without assuming a fixed ID.
+	// Find the system funding account.
 	var systemAccountID int64
 
 	err := tx.QueryRow(
@@ -164,84 +162,20 @@ func (s *PostgresService) fundInitialBalance(
 		return fmt.Errorf("find system account: %w", err)
 	}
 
-	// Lock both accounts in ascending ID order to avoid deadlocks.
-	ids := []int64{systemAccountID, account.ID}
-	if ids[0] > ids[1] {
-		ids[0], ids[1] = ids[1], ids[0]
-	}
-
-	var systemBalance int64
-	var customerBalance int64
-
-	for _, id := range ids {
-		var balance int64
-
-		err := tx.QueryRow(
-			ctx,
-			`SELECT balance_cents FROM accounts WHERE id = $1 FOR UPDATE`,
-			id,
-		).Scan(&balance)
-		if err != nil {
-			return fmt.Errorf("lock account %d: %w", id, err)
-		}
-
-		switch id {
-		case systemAccountID:
-			systemBalance = balance
-		case account.ID:
-			customerBalance = balance
-		}
-	}
-
-	// Protect signed BIGINT balances against overflow and underflow.
-	if systemBalance < math.MinInt64+amount {
-		return errors.New("system account balance underflow")
-	}
-
-	if customerBalance > math.MaxInt64-amount {
-		return errors.New("customer account balance overflow")
-	}
-
-	// Update both balances inside the same PostgreSQL transaction.
-	_, err = tx.Exec(
+	// Move funds atomically from the system account to the customer.
+	newBalance, err := s.moveFunds(
 		ctx,
-		`UPDATE accounts SET balance_cents = balance_cents - $1 WHERE id = $2`,
-		amount,
+		tx,
+		transactionID,
 		systemAccountID,
-	)
-	if err != nil {
-		return fmt.Errorf("debit system account: %w", err)
-	}
-
-	_, err = tx.Exec(
-		ctx,
-		`UPDATE accounts SET balance_cents = balance_cents + $1 WHERE id = $2`,
-		amount,
 		account.ID,
+		amount,
 	)
 	if err != nil {
-		return fmt.Errorf("credit customer account: %w", err)
+		return fmt.Errorf("fund initial balance: %w", err)
 	}
 
-	// Every financial movement must have balanced ledger entries.
-	entries := []ledger.Entry{
-		{
-			TransactionID: transactionID,
-			AccountID:     systemAccountID,
-			AmountCents:   -amount,
-		},
-		{
-			TransactionID: transactionID,
-			AccountID:     account.ID,
-			AmountCents:   amount,
-		},
-	}
-
-	if err := s.ledger.CreateEntries(ctx, tx, entries); err != nil {
-		return fmt.Errorf("create funding ledger entries: %w", err)
-	}
-
-	account.BalanceCents = customerBalance + amount
+	account.BalanceCents = newBalance
 
 	return nil
 }

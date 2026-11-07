@@ -13,6 +13,10 @@ var (
 	ErrMissingIdempotencyKey = errors.New(
 		"idempotency key is required",
 	)
+
+	ErrInvalidDepositAmount = errors.New(
+		"deposit amount must be positive",
+	)
 )
 
 // CreateAccountRequest contains the data needed to open a new account.
@@ -29,7 +33,22 @@ type CreateAccountResult struct {
 	Replay     bool
 }
 
-// Service defines the business operations for bank accounts.
+// DepositRequest contains the data needed to deposit money
+// into an existing customer account.
+type DepositRequest struct {
+	AccountID      int64
+	AmountCents    int64
+	IdempotencyKey string
+}
+
+// DepositResult contains the stored HTTP response
+// and indicates whether the operation was replayed.
+type DepositResult struct {
+	StatusCode int
+	Body       []byte
+	Replay     bool
+}
+
 type Service interface {
 	CreateAccount(
 		ctx context.Context,
@@ -40,4 +59,9 @@ type Service interface {
 		ctx context.Context,
 		id int64,
 	) (*Account, error)
+
+	Deposit(
+		ctx context.Context,
+		request DepositRequest,
+	) (DepositResult, error)
 }
