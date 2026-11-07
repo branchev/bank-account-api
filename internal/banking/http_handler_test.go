@@ -1,10 +1,11 @@
-package account
+package banking
 
 import (
 	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	accountpkg "github.com/branchev/bank-account-api/internal/account"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -23,7 +24,7 @@ type mockAccountService struct {
 	getAccountFunc func(
 		ctx context.Context,
 		id int64,
-	) (*Account, error)
+	) (*accountpkg.Account, error)
 
 	depositFunc func(
 		ctx context.Context,
@@ -46,7 +47,7 @@ func (m *mockAccountService) CreateAccount(
 func (m *mockAccountService) GetAccount(
 	ctx context.Context,
 	id int64,
-) (*Account, error) {
+) (*accountpkg.Account, error) {
 	if m.getAccountFunc == nil {
 		return nil, errors.New("GetAccount is not configured in this mock")
 	}

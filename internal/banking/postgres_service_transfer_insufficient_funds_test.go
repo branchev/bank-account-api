@@ -1,9 +1,10 @@
-package account
+package banking
 
 import (
 	"context"
 	"encoding/json"
 	"errors"
+	accountpkg "github.com/branchev/bank-account-api/internal/account"
 	"testing"
 	"time"
 
@@ -20,12 +21,12 @@ func TestPostgresService_TransferInsufficientFunds(t *testing.T) {
 
 	service := NewPostgresService(
 		pool,
-		NewPostgresRepository(),
+		accountpkg.NewPostgresRepository(),
 		ledger.NewPostgresRepository(),
 		transaction.NewPostgresRepository(),
 	)
 
-	createAccount := func(key string, balance int64) Account {
+	createAccount := func(key string, balance int64) accountpkg.Account {
 		t.Helper()
 
 		result, err := service.CreateAccount(ctx, CreateAccountRequest{
@@ -36,7 +37,7 @@ func TestPostgresService_TransferInsufficientFunds(t *testing.T) {
 			t.Fatalf("create account: %v", err)
 		}
 
-		var account Account
+		var account accountpkg.Account
 		if err := json.Unmarshal(result.Body, &account); err != nil {
 			t.Fatalf("decode account: %v", err)
 		}

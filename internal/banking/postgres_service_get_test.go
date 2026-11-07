@@ -1,8 +1,9 @@
-package account
+package banking
 
 import (
 	"context"
 	"encoding/json"
+	accountpkg "github.com/branchev/bank-account-api/internal/account"
 	"testing"
 
 	"github.com/branchev/bank-account-api/internal/ledger"
@@ -16,7 +17,7 @@ func TestPostgresService_GetAccount(t *testing.T) {
 	pool := testutil.NewPostgresPool(t)
 	defer pool.Close()
 
-	accountRepo := NewPostgresRepository()
+	accountRepo := accountpkg.NewPostgresRepository()
 
 	service := NewPostgresService(
 		pool,
@@ -38,7 +39,7 @@ func TestPostgresService_GetAccount(t *testing.T) {
 	}
 
 	// Retrieve the created account ID from the stored response.
-	var createdAccount Account
+	var createdAccount accountpkg.Account
 
 	if err := json.Unmarshal(created.Body, &createdAccount); err != nil {
 		t.Fatalf("decode created account: %v", err)

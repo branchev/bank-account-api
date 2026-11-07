@@ -1,9 +1,9 @@
-package account
+package banking
 
 import (
 	"context"
 	"encoding/json"
-	"fmt"
+	accountpkg "github.com/branchev/bank-account-api/internal/account"
 	"net/http"
 	"testing"
 	"time"
@@ -13,7 +13,7 @@ import (
 	"github.com/branchev/bank-account-api/internal/transaction"
 )
 
-func TestPostgresService_CreateAccountWithInitialBalance(t *testing.T) {
+func TestPostgresService_CreateAccountWithZeroBalance(t *testing.T) {
 	pool := testutil.NewPostgresPool(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -21,16 +21,14 @@ func TestPostgresService_CreateAccountWithInitialBalance(t *testing.T) {
 
 	service := NewPostgresService(
 		pool,
-		NewPostgresRepository(),
+		accountpkg.NewPostgresRepository(),
 		ledger.NewPostgresRepository(),
 		transaction.NewPostgresRepository(),
 	)
 
-	key := fmt.Sprintf("create-account-test-%d", time.Now().UnixNano())
-
 	result, err := service.CreateAccount(ctx, CreateAccountRequest{
-		InitialBalanceCents: 10000,
-		IdempotencyKey:      key,
+		InitialBalanceCents: 0,
+		IdempotencyKey:      "account-zero-balance-test",
 	})
 	if err != nil {
 		t.Fatalf("create account: %v", err)
@@ -41,10 +39,10 @@ func TestPostgresService_CreateAccountWithInitialBalance(t *testing.T) {
 	}
 
 	if result.Replay {
-		t.Fatal("first request should not be a replay")
+		t.Fatal("first request must not be a replay")
 	}
 
-	var createdAccount Account
+	var createdAccount accountpkg.Account
 	if err := json.Unmarshal(result.Body, &createdAccount); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
@@ -57,13 +55,14 @@ func TestPostgresService_CreateAccountWithInitialBalance(t *testing.T) {
 		t.Fatalf("expected EUR, got %s", createdAccount.Currency)
 	}
 
-	if createdAccount.BalanceCents != 10000 {
+	if createdAccount.BalanceCents != 0 {
 		t.Fatalf(
-			"expected balance 10000, got %d",
+			"expected zero balance, got %d",
 			createdAccount.BalanceCents,
 		)
 	}
 
+	// Verify the persisted account.
 	var databaseBalance int64
 	err = pool.QueryRow(
 		ctx,
@@ -74,10 +73,11 @@ func TestPostgresService_CreateAccountWithInitialBalance(t *testing.T) {
 		t.Fatalf("read customer balance: %v", err)
 	}
 
-	if databaseBalance != 10000 {
-		t.Fatalf("expected database balance 10000, got %d", databaseBalance)
+	if databaseBalance != 0 {
+		t.Fatalf("expected database balance 0, got %d", databaseBalance)
 	}
 
+	// Verify the completed financial transaction.
 	var transactionID int64
 	var storedStatus int
 
@@ -88,7 +88,7 @@ func TestPostgresService_CreateAccountWithInitialBalance(t *testing.T) {
 		FROM transactions
 		WHERE idempotency_key = $1
 		`,
-		key,
+		"account-zero-balance-test",
 	).Scan(&transactionID, &storedStatus)
 	if err != nil {
 		t.Fatalf("read transaction: %v", err)
@@ -98,31 +98,26 @@ func TestPostgresService_CreateAccountWithInitialBalance(t *testing.T) {
 		t.Fatalf("expected stored status 201, got %d", storedStatus)
 	}
 
-	var entryCount int
-	var ledgerSum int64
+	// No money moved, so there must be no ledger entries.
+	var ledgerCount int
 
 	err = pool.QueryRow(
 		ctx,
-		`
-		SELECT COUNT(*), COALESCE(SUM(amount_cents), 0)
-		FROM ledger_entries
-		WHERE transaction_id = $1
-		`,
+		`SELECT COUNT(*) FROM ledger_entries WHERE transaction_id = $1`,
 		transactionID,
-	).Scan(&entryCount, &ledgerSum)
+	).Scan(&ledgerCount)
 	if err != nil {
-		t.Fatalf("read ledger entries: %v", err)
+		t.Fatalf("count ledger entries: %v", err)
 	}
 
-	if entryCount != 2 {
-		t.Fatalf("expected 2 ledger entries, got %d", entryCount)
+	if ledgerCount != 0 {
+		t.Fatalf("expected no ledger entries, got %d", ledgerCount)
 	}
 
-	if ledgerSum != 0 {
-		t.Fatalf("expected balanced ledger, got sum %d", ledgerSum)
-	}
-
+	// The isolated system account starts at zero
+	// and must remain unchanged.
 	var systemBalance int64
+
 	err = pool.QueryRow(
 		ctx,
 		`
@@ -135,9 +130,9 @@ func TestPostgresService_CreateAccountWithInitialBalance(t *testing.T) {
 		t.Fatalf("read system balance: %v", err)
 	}
 
-	if systemBalance != -10000 {
+	if systemBalance != 0 {
 		t.Fatalf(
-			"expected system balance -10000, got %d",
+			"expected system balance 0, got %d",
 			systemBalance,
 		)
 	}

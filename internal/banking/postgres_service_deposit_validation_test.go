@@ -1,9 +1,10 @@
-package account
+package banking
 
 import (
 	"context"
 	"encoding/json"
 	"errors"
+	accountpkg "github.com/branchev/bank-account-api/internal/account"
 	"math"
 	"testing"
 
@@ -19,7 +20,7 @@ func TestPostgresService_DepositValidation(t *testing.T) {
 
 	service := NewPostgresService(
 		pool,
-		NewPostgresRepository(),
+		accountpkg.NewPostgresRepository(),
 		ledger.NewPostgresRepository(),
 		transaction.NewPostgresRepository(),
 	)
@@ -31,7 +32,7 @@ func TestPostgresService_DepositValidation(t *testing.T) {
 		t.Fatalf("create account: %v", err)
 	}
 
-	var account Account
+	var account accountpkg.Account
 	if err := json.Unmarshal(created.Body, &account); err != nil {
 		t.Fatalf("decode account: %v", err)
 	}

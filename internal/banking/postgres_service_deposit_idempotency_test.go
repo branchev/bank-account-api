@@ -1,9 +1,10 @@
-package account
+package banking
 
 import (
 	"context"
 	"encoding/json"
 	"errors"
+	accountpkg "github.com/branchev/bank-account-api/internal/account"
 	"net/http"
 	"testing"
 	"time"
@@ -21,7 +22,7 @@ func TestPostgresService_DepositIdempotency(t *testing.T) {
 
 	service := NewPostgresService(
 		pool,
-		NewPostgresRepository(),
+		accountpkg.NewPostgresRepository(),
 		ledger.NewPostgresRepository(),
 		transaction.NewPostgresRepository(),
 	)
@@ -36,7 +37,7 @@ func TestPostgresService_DepositIdempotency(t *testing.T) {
 			t.Fatalf("create account: %v", err)
 		}
 
-		var account Account
+		var account accountpkg.Account
 		if err := json.Unmarshal(result.Body, &account); err != nil {
 			t.Fatalf("decode account: %v", err)
 		}
@@ -73,7 +74,7 @@ func TestPostgresService_DepositIdempotency(t *testing.T) {
 		t.Fatalf("unexpected replay result: %+v", second)
 	}
 
-	var firstAccount, secondAccount Account
+	var firstAccount, secondAccount accountpkg.Account
 
 	if err := json.Unmarshal(first.Body, &firstAccount); err != nil {
 		t.Fatalf("decode first response: %v", err)

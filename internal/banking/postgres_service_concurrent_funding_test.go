@@ -1,8 +1,9 @@
-package account
+package banking
 
 import (
 	"context"
 	"encoding/json"
+	accountpkg "github.com/branchev/bank-account-api/internal/account"
 	"net/http"
 	"sync"
 	"testing"
@@ -24,7 +25,7 @@ func TestPostgresService_ConcurrentInitialFunding(t *testing.T) {
 
 	service := NewPostgresService(
 		pool,
-		NewPostgresRepository(),
+		accountpkg.NewPostgresRepository(),
 		ledger.NewPostgresRepository(),
 		transaction.NewPostgresRepository(),
 	)
@@ -84,7 +85,7 @@ func TestPostgresService_ConcurrentInitialFunding(t *testing.T) {
 			t.Fatalf("request %d: unexpected replay", i)
 		}
 
-		var createdAccount Account
+		var createdAccount accountpkg.Account
 
 		if err := json.Unmarshal(
 			outcome.result.Body,

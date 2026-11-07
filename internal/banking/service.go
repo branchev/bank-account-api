@@ -1,8 +1,10 @@
-package account
+package banking
 
 import (
 	"context"
 	"errors"
+
+	"github.com/branchev/bank-account-api/internal/account"
 )
 
 var (
@@ -62,7 +64,7 @@ type Service interface {
 	GetAccount(
 		ctx context.Context,
 		id int64,
-	) (*Account, error)
+	) (*account.Account, error)
 
 	Deposit(
 		ctx context.Context,

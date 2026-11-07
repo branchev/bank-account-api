@@ -1,8 +1,9 @@
-package account
+package banking
 
 import (
 	"context"
 	"encoding/json"
+	accountpkg "github.com/branchev/bank-account-api/internal/account"
 	"net/http"
 	"sync"
 	"testing"
@@ -21,7 +22,7 @@ func TestPostgresService_CreateAccountConcurrentIdempotency(t *testing.T) {
 
 	service := NewPostgresService(
 		pool,
-		NewPostgresRepository(),
+		accountpkg.NewPostgresRepository(),
 		ledger.NewPostgresRepository(),
 		transaction.NewPostgresRepository(),
 	)
@@ -84,7 +85,7 @@ func TestPostgresService_CreateAccountConcurrentIdempotency(t *testing.T) {
 			createdCount++
 		}
 
-		var account Account
+		var account accountpkg.Account
 		if err := json.Unmarshal(outcome.result.Body, &account); err != nil {
 			t.Fatalf("request %d: decode response: %v", i, err)
 		}

@@ -1,8 +1,9 @@
-package account
+package banking
 
 import (
 	"context"
 	"errors"
+	accountpkg "github.com/branchev/bank-account-api/internal/account"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -14,7 +15,7 @@ func TestHTTPHandler_GetAccount(t *testing.T) {
 	tests := []struct {
 		name           string
 		path           string
-		account        *Account
+		account        *accountpkg.Account
 		serviceErr     error
 		wantStatus     int
 		wantServiceHit bool
@@ -22,7 +23,7 @@ func TestHTTPHandler_GetAccount(t *testing.T) {
 		{
 			name: "existing account",
 			path: "/api/v1/accounts/199",
-			account: &Account{
+			account: &accountpkg.Account{
 				ID:           199,
 				Currency:     "EUR",
 				BalanceCents: 10000,
@@ -64,7 +65,7 @@ func TestHTTPHandler_GetAccount(t *testing.T) {
 				getAccountFunc: func(
 					ctx context.Context,
 					id int64,
-				) (*Account, error) {
+				) (*accountpkg.Account, error) {
 					serviceCalled = true
 					return tt.account, tt.serviceErr
 				},

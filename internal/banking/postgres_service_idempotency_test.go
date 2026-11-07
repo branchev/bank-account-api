@@ -1,8 +1,9 @@
-package account
+package banking
 
 import (
 	"context"
 	"encoding/json"
+	accountpkg "github.com/branchev/bank-account-api/internal/account"
 	"net/http"
 	"reflect"
 	"testing"
@@ -21,7 +22,7 @@ func TestPostgresService_CreateAccountIdempotency(t *testing.T) {
 
 	service := NewPostgresService(
 		pool,
-		NewPostgresRepository(),
+		accountpkg.NewPostgresRepository(),
 		ledger.NewPostgresRepository(),
 		transaction.NewPostgresRepository(),
 	)

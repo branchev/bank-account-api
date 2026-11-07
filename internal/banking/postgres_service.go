@@ -1,4 +1,4 @@
-package account
+package banking
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/branchev/bank-account-api/internal/account"
 	"github.com/branchev/bank-account-api/internal/ledger"
 	"github.com/branchev/bank-account-api/internal/transaction"
 	"github.com/jackc/pgx/v5"
@@ -17,14 +18,14 @@ import (
 // PostgresService coordinates account creation in one database transaction.
 type PostgresService struct {
 	pool         *pgxpool.Pool
-	accounts     Repository
+	accounts     account.Repository
 	ledger       ledger.Repository
 	transactions transaction.Repository
 }
 
 func NewPostgresService(
 	pool *pgxpool.Pool,
-	accounts Repository,
+	accounts account.Repository,
 	ledgerRepo ledger.Repository,
 	transactionRepo transaction.Repository,
 ) *PostgresService {
@@ -97,7 +98,7 @@ func (s *PostgresService) CreateAccount(
 		}, nil
 	}
 
-	account := &Account{
+	account := &account.Account{
 		Currency:     "EUR",
 		BalanceCents: 0,
 	}
@@ -148,7 +149,7 @@ func (s *PostgresService) fundInitialBalance(
 	ctx context.Context,
 	tx pgx.Tx,
 	transactionID int64,
-	account *Account,
+	account *account.Account,
 	amount int64,
 ) error {
 	// Find the system funding account.
@@ -190,7 +191,7 @@ func hashCreateAccountRequest(initialBalanceCents int64) string {
 func (s *PostgresService) GetAccount(
 	ctx context.Context,
 	id int64,
-) (*Account, error) {
+) (*account.Account, error) {
 	account, err := s.accounts.GetByID(
 		ctx,
 		s.pool,

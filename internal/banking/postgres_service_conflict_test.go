@@ -1,8 +1,9 @@
-package account
+package banking
 
 import (
 	"context"
 	"errors"
+	accountpkg "github.com/branchev/bank-account-api/internal/account"
 	"testing"
 	"time"
 
@@ -19,7 +20,7 @@ func TestPostgresService_CreateAccountIdempotencyConflict(t *testing.T) {
 
 	service := NewPostgresService(
 		pool,
-		NewPostgresRepository(),
+		accountpkg.NewPostgresRepository(),
 		ledger.NewPostgresRepository(),
 		transaction.NewPostgresRepository(),
 	)

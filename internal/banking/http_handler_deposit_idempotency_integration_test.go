@@ -1,9 +1,10 @@
-package account
+package banking
 
 import (
 	"bytes"
 	"context"
 	"encoding/json"
+	accountpkg "github.com/branchev/bank-account-api/internal/account"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -20,7 +21,7 @@ func TestHTTPHandler_DepositIdempotencyIntegration(t *testing.T) {
 
 	service := NewPostgresService(
 		pool,
-		NewPostgresRepository(),
+		accountpkg.NewPostgresRepository(),
 		ledger.NewPostgresRepository(),
 		transaction.NewPostgresRepository(),
 	)
@@ -32,7 +33,7 @@ func TestHTTPHandler_DepositIdempotencyIntegration(t *testing.T) {
 		t.Fatalf("create account: %v", err)
 	}
 
-	var account Account
+	var account accountpkg.Account
 	if err := json.Unmarshal(created.Body, &account); err != nil {
 		t.Fatalf("decode account: %v", err)
 	}
@@ -88,7 +89,7 @@ func TestHTTPHandler_DepositIdempotencyIntegration(t *testing.T) {
 			second.Code, second.Body.String())
 	}
 
-	var firstAccount, replayedAccount Account
+	var firstAccount, replayedAccount accountpkg.Account
 
 	if err := json.Unmarshal(first.Body.Bytes(), &firstAccount); err != nil {
 		t.Fatalf("decode first response: %v", err)
