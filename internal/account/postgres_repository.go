@@ -19,25 +19,17 @@ func (r *PostgresRepository) Create(
 	account *Account,
 ) error {
 	const query = `
-		INSERT INTO accounts (
-			account_type,
-			currency,
-			balance_cents
-		)
-		VALUES ('customer', $1, $2)
+		INSERT INTO accounts (account_type, currency, balance_cents)
+		VALUES ('customer', $1, 0)
 		RETURNING id
 	`
 
-	err := db.QueryRow(
-		ctx,
-		query,
-		account.Currency,
-		account.BalanceCents,
-	).Scan(&account.ID)
-
+	err := db.QueryRow(ctx, query, account.Currency).Scan(&account.ID)
 	if err != nil {
 		return fmt.Errorf("create account: %w", err)
 	}
+
+	account.BalanceCents = 0
 
 	return nil
 }
