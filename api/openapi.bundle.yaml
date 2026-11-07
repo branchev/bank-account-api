@@ -16,6 +16,8 @@ tags:
     description: Application health checks
   - name: Accounts
     description: Bank account management
+  - name: Transfers
+    description: Transfers between bank accounts
 paths:
   /health:
     get:
@@ -73,6 +75,37 @@ paths:
           description: Invalid request payload or missing Idempotency-Key.
         '409':
           description: Idempotency-Key reused with a different request.
+  /api/v1/accounts/{id}:
+    get:
+      tags:
+        - Accounts
+      summary: Get a bank account
+      description: |
+        Retrieves an existing customer bank account by its ID,
+        including its currency and current balance.
+      operationId: getAccountById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Unique identifier of the bank account.
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      responses:
+        '200':
+          description: Bank account retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/account'
+        '400':
+          description: Invalid account ID.
+        '404':
+          description: Bank account not found.
+        '500':
+          description: Internal server error.
   /api/v1/accounts/{id}/deposits:
     post:
       tags:
