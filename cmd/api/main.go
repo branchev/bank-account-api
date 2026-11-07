@@ -12,8 +12,10 @@ import (
 
 	"github.com/branchev/bank-account-api/api"
 	"github.com/branchev/bank-account-api/internal/account"
+	"github.com/branchev/bank-account-api/internal/banking"
 	"github.com/branchev/bank-account-api/internal/ledger"
 	"github.com/branchev/bank-account-api/internal/platform/database"
+	"github.com/branchev/bank-account-api/internal/platform/httpmiddleware"
 	"github.com/branchev/bank-account-api/internal/transaction"
 )
 
@@ -44,7 +46,7 @@ func main() {
 	transactionRepository := transaction.NewPostgresRepository()
 
 	// Initialize the account service.
-	accountService := account.NewPostgresService(
+	accountService := banking.NewPostgresService(
 		pool,
 		accountRepository,
 		ledgerRepository,
@@ -52,7 +54,7 @@ func main() {
 	)
 
 	// Initialize the HTTP handler.
-	accountHandler := account.NewHTTPHandler(accountService)
+	accountHandler := banking.NewHTTPHandler(accountService)
 
 	// Register HTTP routes.
 	mux := http.NewServeMux()
@@ -72,7 +74,7 @@ func main() {
 
 	server := &http.Server{
 		Addr:              ":" + port,
-		Handler:           mux,
+		Handler:           httpmiddleware.RequestLogger(mux),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
