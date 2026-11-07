@@ -1,0 +1,50 @@
+type: object
+required:
+  - status
+  - accounts_checked
+  - transactions_checked
+  - discrepancies
+properties:
+  status:
+    type: string
+    enum:
+      - consistent
+      - inconsistent
+    example: consistent
+
+  accounts_checked:
+    type: integer
+    format: int64
+    example: 8
+
+  transactions_checked:
+    type: integer
+    format: int64
+    example: 13
+
+  discrepancies:
+    type: array
+    items:
+      type: object
+      required:
+        - type
+        - expected_cents
+        - actual_cents
+      properties:
+        type:
+          type: string
+          enum:
+            - account_balance_mismatch
+            - transaction_imbalance
+        account_id:
+          type: integer
+          format: int64
+        transaction_id:
+          type: integer
+          format: int64
+        expected_cents:
+          type: integer
+          format: int64
+        actual_cents:
+          type: integer
+          format: int64

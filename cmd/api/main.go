@@ -16,6 +16,7 @@ import (
 	"github.com/branchev/bank-account-api/internal/ledger"
 	"github.com/branchev/bank-account-api/internal/platform/database"
 	"github.com/branchev/bank-account-api/internal/platform/httpmiddleware"
+	"github.com/branchev/bank-account-api/internal/reconciliation"
 	"github.com/branchev/bank-account-api/internal/transaction"
 )
 
@@ -32,6 +33,7 @@ func main() {
 		log.Fatal("DATABASE_URL environment variable is required")
 	}
 
+	// Initialize database connection.
 	pool, err := database.NewPool(ctx, databaseURL)
 	if err != nil {
 		log.Fatalf("database connection failed: %v", err)
@@ -45,7 +47,7 @@ func main() {
 	ledgerRepository := ledger.NewPostgresRepository()
 	transactionRepository := transaction.NewPostgresRepository()
 
-	// Initialize the account service.
+	// Initialize services.
 	accountService := banking.NewPostgresService(
 		pool,
 		accountRepository,
@@ -53,20 +55,34 @@ func main() {
 		transactionRepository,
 	)
 
-	// Initialize the HTTP handler.
+	reconciliationService := reconciliation.NewPostgresService(pool)
+
+	// Initialize HTTP handlers.
 	accountHandler := banking.NewHTTPHandler(accountService)
+	reconciliationHandler := reconciliation.NewHTTPHandler(reconciliationService)
 
 	// Register HTTP routes.
 	mux := http.NewServeMux()
 
+	// Swagger UI and OpenAPI documentation.
 	api.RegisterRoutes(mux)
+
+	// Banking endpoints.
 	accountHandler.RegisterRoutes(mux)
 
+	// Health check.
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("OK"))
 	})
 
+	// Read-only reconciliation endpoint.
+	mux.HandleFunc(
+		"GET /api/v1/reconciliation",
+		reconciliationHandler.Reconcile,
+	)
+
+	// Configure HTTP server.
 	port := os.Getenv("APP_PORT")
 	if port == "" {
 		port = "8080"
@@ -78,6 +94,7 @@ func main() {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
+	// Start HTTP server.
 	go func() {
 		log.Printf("Bank API listening on port %s", port)
 
@@ -88,8 +105,10 @@ func main() {
 		}
 	}()
 
+	// Wait for termination signal.
 	<-ctx.Done()
 
+	// Graceful shutdown.
 	shutdownCtx, cancel := context.WithTimeout(
 		context.Background(),
 		10*time.Second,

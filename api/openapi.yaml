@@ -8,8 +8,7 @@ info:
     REST API for managing bank accounts and financial transactions.
 
     The API follows a modular monolith architecture.
-    Financial operations will support atomicity, concurrency safety,
-    and idempotency.
+    Financial operations support atomicity, concurrency safety, and idempotency.
 
 servers:
   - url: http://localhost:8080
@@ -18,10 +17,15 @@ servers:
 tags:
   - name: Health
     description: Application health checks
+
   - name: Accounts
     description: Bank account management
+
   - name: Transfers
     description: Transfers between bank accounts
+
+  - name: Reconciliation
+    description: Read-only ledger consistency checks
 
 paths:
   /health:
@@ -38,3 +42,6 @@ paths:
 
   /api/v1/transfers:
     $ref: ./paths/transfers.yaml
+
+  /api/v1/reconciliation:
+    $ref: "./paths/reconciliation.yaml"

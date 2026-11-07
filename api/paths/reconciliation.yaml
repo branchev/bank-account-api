@@ -1,0 +1,38 @@
+get:
+  tags:
+    - Reconciliation
+  summary: Reconcile account balances and ledger transactions
+  description: |
+    Performs a read-only consistency check against the ledger.
+
+    Verifies that:
+    - Each account balance matches the sum of its ledger entries.
+    - The sum of ledger entries for each transaction equals zero.
+
+    The check runs inside a PostgreSQL read-only,
+    repeatable-read transaction to ensure a consistent snapshot.
+
+    A successful execution returns HTTP 200 even when
+    discrepancies are detected. The status field indicates
+    whether the data is consistent.
+
+  operationId: reconcileLedger
+
+  responses:
+    "200":
+      description: Reconciliation report
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/reconciliation_report.yaml"
+
+    "500":
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: internal server error
