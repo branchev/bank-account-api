@@ -252,4 +252,21 @@ func hashCreateAccountRequest(initialBalanceCents int64) string {
 	return hex.EncodeToString(sum[:])
 }
 
+// GetAccount retrieves a customer account by its ID.
+func (s *PostgresService) GetAccount(
+	ctx context.Context,
+	id int64,
+) (*Account, error) {
+	account, err := s.accounts.GetByID(
+		ctx,
+		s.pool,
+		id,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get account %d: %w", id, err)
+	}
+
+	return account, nil
+}
+
 var _ Service = (*PostgresService)(nil)
