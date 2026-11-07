@@ -6,18 +6,22 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/branchev/bank-account-api/internal/platform/database"
+	"github.com/jackc/pgx/v5"
 )
 
+// PostgresRepository implements Repository using PostgreSQL.
 type PostgresRepository struct{}
 
+// NewPostgresRepository creates a PostgreSQL ledger repository.
 func NewPostgresRepository() *PostgresRepository {
 	return &PostgresRepository{}
 }
 
+// CreateEntries validates and inserts balanced ledger entries.
+// The caller owns the PostgreSQL transaction and must commit or roll it back.
 func (r *PostgresRepository) CreateEntries(
 	ctx context.Context,
-	db database.Querier,
+	tx pgx.Tx,
 	entries []Entry,
 ) error {
 	if len(entries) < 2 {
@@ -25,7 +29,6 @@ func (r *PostgresRepository) CreateEntries(
 	}
 
 	transactionID := entries[0].TransactionID
-
 	if transactionID <= 0 {
 		return errors.New("invalid ledger transaction ID")
 	}
@@ -45,7 +48,7 @@ func (r *PostgresRepository) CreateEntries(
 			return errors.New("ledger entry amount cannot be zero")
 		}
 
-		// Check for integer overflow before adding signed amounts.
+		// Detect integer overflow before adding signed amounts.
 		if (entry.AmountCents > 0 && sum > math.MaxInt64-entry.AmountCents) ||
 			(entry.AmountCents < 0 && sum < math.MinInt64-entry.AmountCents) {
 			return errors.New("ledger amount sum overflow")
@@ -55,7 +58,10 @@ func (r *PostgresRepository) CreateEntries(
 	}
 
 	if sum != 0 {
-		return fmt.Errorf("unbalanced ledger posting: sum is %d cents", sum)
+		return fmt.Errorf(
+			"unbalanced ledger posting: sum is %d cents",
+			sum,
+		)
 	}
 
 	const query = `
@@ -68,7 +74,7 @@ func (r *PostgresRepository) CreateEntries(
 	`
 
 	for _, entry := range entries {
-		_, err := db.Exec(
+		_, err := tx.Exec(
 			ctx,
 			query,
 			entry.TransactionID,
@@ -83,4 +89,5 @@ func (r *PostgresRepository) CreateEntries(
 	return nil
 }
 
+// Verify at compile time that PostgresRepository implements Repository.
 var _ Repository = (*PostgresRepository)(nil)
