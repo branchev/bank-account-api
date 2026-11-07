@@ -1,179 +1,55 @@
 # Bank Account API
 
-A Go-based banking REST API developed as a backend engineering take-home assignment.
+A Go REST API for managing bank accounts and performing financial transactions, developed as a backend engineering take-home assignment.
 
-## Overview
+The implementation focuses on **financial correctness, atomicity, concurrency safety, idempotency, and maintainability**.
 
-The application is designed around three core financial operations:
+## Features
 
-- Create a bank account with a zero or specified initial balance.
-- Deposit money into an existing account.
-- Transfer money atomically between accounts.
+The API supports three core banking operations:
 
-The implementation prioritizes **financial correctness, concurrency safety, maintainability, and testability**. Development is incremental: the account-creation workflow is implemented and tested; deposits and transfers are upcoming work.
+- **Create an account** with a zero or specified initial balance.
+- **Deposit funds** into an existing account.
+- **Transfer funds** atomically between accounts.
 
-## Architecture
+Additional capabilities include:
 
-The project follows a **modular monolith** architecture, with PostgreSQL as its transactional data store. Business domains are separated within one deployable application, avoiding unnecessary distributed-system complexity while preserving clear module boundaries.
-
-### Design Goals
-
-- ACID transactions and concurrency-safe balance changes.
+- Retrieve account details and current balance.
+- Idempotent financial operations using the `Idempotency-Key` header.
 - Double-entry ledger for financial traceability.
-- Idempotent financial write operations.
-- Consistent account balances.
-- Internal reconciliation (planned).
-- Reproducible local development with Docker Compose.
-- Versioned REST API and modular OpenAPI documentation.
+- PostgreSQL transactions and deterministic row-level locking.
+- Read-only reconciliation of account balances and ledger transactions.
+- OpenAPI documentation and Swagger UI.
+- Unit, integration, and concurrency tests.
 
-### Technology Stack
+## Technology Stack
 
-- **Go** — application code, HTTP server, routing, and tests.
-- **PostgreSQL 17** — transactional data store.
+- **Go** — application code and HTTP server.
+- **PostgreSQL 17** — transactional persistence.
 - **pgx/v5** — PostgreSQL driver and connection pooling.
-- **Goose v3** — schema migrations.
+- **Goose v3** — database migrations.
 - **Docker Compose** — local PostgreSQL environment.
-- **OpenAPI 3.0.3** — API contract.
-- **Swagger UI** — interactive API documentation.
-- **vacuum** — bundling modular OpenAPI YAML files.
+- **OpenAPI 3.0.3 / Swagger UI** — API documentation.
 
-## Project Status
+The application follows a **modular monolith** architecture. Business logic, persistence, HTTP handlers, and infrastructure concerns are separated into packages within a single deployable application.
 
-**Work in progress.**
+## Getting Started
 
-### Implemented
+### Prerequisites
 
-- HTTP server with graceful shutdown and PostgreSQL connectivity checks at startup.
-- PostgreSQL Docker Compose setup and Goose migrations.
-- Accounts, transactions, and immutable ledger-entry persistence.
-- Seeded internal system funding account and database constraints.
-- `GET /health`, `GET /openapi.yaml`, and `GET /swagger`.
-- `POST /api/v1/accounts`, including optional initial funding.
-- Atomic account creation and initial funding in a single PostgreSQL transaction.
-- Double-entry posting for positive initial balances.
-- Idempotency-key reservation, response replay, and conflict detection.
-- Deterministic account row-lock ordering and signed integer overflow checks for initial funding.
-- Repository, service, HTTP, integration, and concurrency tests, including race-detector runs.
-- Isolated PostgreSQL schemas for integration tests.
+- Go (version specified in `go.mod`)
+- Docker and Docker Compose
+- Goose v3
 
-### In Progress / Planned
-
-- `GET /api/v1/accounts/{id}` — repository lookup and service method exist; HTTP endpoint is not yet registered.
-- `POST /api/v1/accounts/{id}/deposits`.
-- `POST /api/v1/transfers`.
-- Ledger/account balance reconciliation command.
-- OpenAPI coverage for business endpoints and regeneration of the embedded bundle.
-- Additional end-to-end and financial-invariant tests as features are completed.
-
-## Architecture and Conventions
-
-### API Conventions
-
-| Area | Convention |
-|---|---|
-| API versioning | `/api/v1` |
-| Resource naming | RESTful plural nouns (`/accounts`, `/transfers`) |
-| Request/response format | JSON with `snake_case` field names |
-| Error format | JSON object containing an `error` field |
-| API specification | OpenAPI 3.0.3 |
-| Specification organization | Modular YAML with external `$ref` references |
-| Interactive documentation | `/swagger` |
-| Bundled specification | `/openapi.yaml` |
-| Health check | `/health` (outside the versioned namespace) |
-| Idempotency | `Idempotency-Key` header for financial writes |
-
-### Go Conventions
-
-- Follow idiomatic Go naming (`MixedCaps` for identifiers).
-- Keep HTTP handlers responsible for transport concerns: parsing, validation, and responses.
-- Put business rules and transactional coordination in domain services.
-- Encapsulate persistence behind repository interfaces where useful.
-- Propagate `context.Context` through request-scoped operations.
-- Prefer the standard library unless a dependency adds clear value.
-- Keep `cmd/api/main.go` focused on dependency wiring and server lifecycle.
-
-### Persistence and Financial Integrity
-
-- **Currency:** EUR.
-- **Money representation:** signed `int64` cents in Go and `BIGINT` in PostgreSQL; no floating-point arithmetic for money.
-- **Account balances:** customer balances cannot be negative; the internal system funding account may carry a negative balance.
-- **Atomicity:** account creation, optional initial funding, ledger entries, and stored idempotency response are committed together.
-- **Double-entry ledger:** each positive initial funding operation debits the system account and credits the customer account by equal amounts.
-- **Immutability:** database triggers prevent modifications to existing ledger entries.
-- **Concurrency:** affected account rows are locked in ascending account-ID order to reduce deadlock risk.
-- **Idempotency:** a repeated key with the same operation and payload returns the stored result; reusing the key with a different payload returns `409 Conflict`.
-- **Reconciliation:** independently checking account balances against ledger totals is planned.
-
-For a funded account, the ledger invariant is:
-
-```text
-SUM(ledger_entries.amount_cents) = 0  (per financial transaction)
-```
-
-For example, funding a customer account with EUR 100.00 creates entries of `-10000` cents for the system account and `+10000` cents for the customer account.
-
-### Project Structure
-
-```text
-bank-api/
-├── api/
-│   ├── handler.go
-│   ├── handler_test.go
-│   ├── openapi.yaml
-│   ├── openapi.bundle.yaml
-│   ├── paths/
-│   ├── schemas/
-│   └── swagger/
-├── cmd/
-│   ├── api/
-│   │   └── main.go
-│   └── reconcile/                  # Planned
-├── internal/
-│   ├── account/                    # Model, repository, service, HTTP handler, tests
-│   ├── ledger/                     # Balanced ledger posting
-│   ├── transaction/                # Idempotency and transaction persistence
-│   ├── transfer/                   # Planned
-│   └── platform/
-│       └── database/               # Pool, query interface, test utilities
-├── migrations/
-│   ├── 20261106105043_init_schema.sql
-│   └── 20261106124712_unique_system_account.sql
-├── docker-compose.yml
-├── go.mod
-├── go.sum
-└── README.md
-```
-
-The top-level `api` package serves embedded API documentation. Domain packages under `internal` own business behavior and persistence. The `cmd/api` package is the application entry point; `cmd/reconcile` is reserved for a future reconciliation command.
-
-## Prerequisites
-
-- Go (use the version specified by `go.mod`).
-- Docker and Docker Compose.
-- Goose v3 for applying migrations.
-- `vacuum` only when editing or regenerating the OpenAPI specification.
-
-### Install Goose
+Install Goose:
 
 ```bash
 go install github.com/pressly/goose/v3/cmd/goose@v3.29.0
-$(go env GOPATH)/bin/goose -version
 ```
 
-Ensure `$(go env GOPATH)/bin` is on your `PATH` to invoke `goose` directly, or use its absolute path.
+Ensure `$(go env GOPATH)/bin` is included in your `PATH`, or invoke Goose using its absolute path.
 
-### Install vacuum
-
-```bash
-go install github.com/daveshanley/vacuum@v0.39.1
-$(go env GOPATH)/bin/vacuum version
-```
-
-The generated OpenAPI bundle is committed to the repository, so `vacuum` is not needed to run the application.
-
-## Running the Application
-
-### 1. Configure Environment
+### 1. Configure the Environment
 
 From the repository root:
 
@@ -181,7 +57,7 @@ From the repository root:
 cp .env.example .env
 ```
 
-Review `.env` for the local database connection and optional `APP_PORT`. The `.env` file should remain excluded from version control.
+The supplied configuration uses PostgreSQL on `127.0.0.1:5433` and the `bank_api` database.
 
 ### 2. Start PostgreSQL
 
@@ -190,11 +66,9 @@ docker compose up -d
 docker compose ps
 ```
 
-The local development configuration uses PostgreSQL at `127.0.0.1:5433`.
-
 ### 3. Apply Database Migrations
 
-Load the application environment in the terminal:
+Load the environment variables:
 
 ```bash
 set -a
@@ -202,70 +76,65 @@ source .env
 set +a
 ```
 
-Apply and inspect migrations:
+Apply the migrations:
 
 ```bash
 goose -dir migrations postgres "$DATABASE_URL" up
+```
+
+Check migration status:
+
+```bash
 goose -dir migrations postgres "$DATABASE_URL" status
 ```
 
-To roll back the latest migration in a controlled development environment:
-
-```bash
-goose -dir migrations postgres "$DATABASE_URL" down
-```
-
-**Warning:** Migration rollback can delete data. Review the migration before using `down`, especially outside a disposable local environment.
-
 ### 4. Start the API
-
-With PostgreSQL running and migrations applied:
 
 ```bash
 go run ./cmd/api
 ```
 
-The server uses `DATABASE_URL` and listens on `APP_PORT` (default `8080`). It handles `SIGINT` and `SIGTERM` with graceful shutdown.
+The API requires `DATABASE_URL` and listens on the port configured by `APP_PORT` (default: `8080`). It supports graceful shutdown on SIGINT and SIGTERM.
 
-### 5. Verify Health
+### 5. Verify the Application
 
 ```bash
 curl -i http://localhost:8080/health
 ```
 
-Expected response: `200 OK`, with body `OK`.
+Expected response:
 
-The health endpoint checks HTTP availability; PostgreSQL connectivity is checked at application startup.
+```text
+HTTP/1.1 200 OK
+
+OK
+```
+
+PostgreSQL connectivity is verified during application startup.
 
 ## API Endpoints
 
-| Method | Endpoint | Status | Description |
-|---|---|---|---|
-| `GET` | `/health` | Implemented | HTTP health check |
-| `GET` | `/openapi.yaml` | Implemented | Embedded bundled specification |
-| `GET` | `/swagger` | Implemented | Swagger UI |
-| `POST` | `/api/v1/accounts` | Implemented | Create a customer account |
-| `GET` | `/api/v1/accounts/{id}` | In progress | Retrieve a customer account |
-| `POST` | `/api/v1/accounts/{id}/deposits` | Planned | Deposit funds |
-| `POST` | `/api/v1/transfers` | Planned | Transfer funds atomically |
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/health` | Application health check |
+| `POST` | `/api/v1/accounts` | Create an account |
+| `GET` | `/api/v1/accounts/{id}` | Retrieve account details |
+| `POST` | `/api/v1/accounts/{id}/deposits` | Deposit funds |
+| `POST` | `/api/v1/transfers` | Transfer funds between accounts |
+| `GET` | `/api/v1/reconciliation` | Check ledger and account consistency |
+| `GET` | `/openapi.yaml` | Bundled OpenAPI specification |
+| `GET` | `/swagger` | Interactive Swagger UI |
+
+All monetary values are expressed as **integer EUR cents**.
 
 ### Create an Account
 
-```http
-POST /api/v1/accounts
-Content-Type: application/json
-Idempotency-Key: create-account-001
+```bash
+curl -i -X POST http://localhost:8080/api/v1/accounts \
+  -H 'Content-Type: application/json' \
+  -H 'Idempotency-Key: create-account-001' \
+  -d '{"initial_balance_cents":10000}'
 ```
-
-Request body:
-
-```json
-{
-  "initial_balance_cents": 10000
-}
-```
-
-`initial_balance_cents` is optional and defaults to zero. Negative amounts are rejected. Amounts are integer EUR cents.
 
 Example successful response (`201 Created`):
 
@@ -277,76 +146,204 @@ Example successful response (`201 Created`):
 }
 ```
 
-The account ID is database-generated and will vary. Positive initial funding is transferred from the internal system account and recorded as balanced ledger entries in the same database transaction.
+`initial_balance_cents` is optional and defaults to zero. Negative initial balances are rejected.
 
-Try it locally:
-
-```bash
-curl -i -X POST http://localhost:8080/api/v1/accounts \
-  -H 'Content-Type: application/json' \
-  -H 'Idempotency-Key: create-account-demo-001' \
-  -d '{"initial_balance_cents":10000}'
-```
-
-To create an account with a zero balance:
+### Deposit Funds
 
 ```bash
-curl -i -X POST http://localhost:8080/api/v1/accounts \
+curl -i -X POST http://localhost:8080/api/v1/accounts/2/deposits \
   -H 'Content-Type: application/json' \
-  -H 'Idempotency-Key: create-account-demo-002' \
-  -d '{}'
+  -H 'Idempotency-Key: deposit-001' \
+  -d '{"amount_cents":5000}'
 ```
 
-### Idempotent Retries
+Replace `2` with an existing customer account ID.
 
-Repeat the first request with **the same key and the same amount**:
+### Transfer Funds
 
 ```bash
-curl -i -X POST http://localhost:8080/api/v1/accounts \
+curl -i -X POST http://localhost:8080/api/v1/transfers \
   -H 'Content-Type: application/json' \
-  -H 'Idempotency-Key: create-account-demo-001' \
-  -d '{"initial_balance_cents":10000}'
+  -H 'Idempotency-Key: transfer-001' \
+  -d '{
+    "source_account_id": 2,
+    "destination_account_id": 3,
+    "amount_cents": 2500
+  }'
 ```
 
-The API returns `201 Created` with the original account ID and response data. It does **not** create another account or post funding a second time.
+Both accounts must exist, and the source account must have sufficient funds.
 
-Reusing that key with a different amount produces `409 Conflict`:
+### Reconciliation
 
 ```bash
-curl -i -X POST http://localhost:8080/api/v1/accounts \
-  -H 'Content-Type: application/json' \
-  -H 'Idempotency-Key: create-account-demo-001' \
-  -d '{"initial_balance_cents":20000}'
+curl -s http://localhost:8080/api/v1/reconciliation
 ```
 
-Example error:
+Example response:
 
 ```json
 {
-  "error": "idempotency key already used with a different request"
+  "status": "consistent",
+  "accounts_checked": 8,
+  "transactions_checked": 13,
+  "discrepancies": []
 }
 ```
 
-A missing `Idempotency-Key`, invalid JSON, an unsupported JSON shape, or a negative initial balance produces `400 Bad Request`.
+Reconciliation checks that:
+
+- Each account balance matches the sum of its ledger entries.
+- Ledger entries for each financial transaction sum to zero.
+
+It executes inside a read-only PostgreSQL transaction using `REPEATABLE READ` isolation, providing a consistent database snapshot.
+
+A successful reconciliation request returns HTTP `200`, even if discrepancies are detected. The `status` field indicates whether the data is consistent.
+
+## Financial Integrity
+
+### Atomicity
+
+Financial operations execute inside PostgreSQL transactions.
+
+Account balances, transaction records, ledger entries, and stored idempotency responses are committed together.
+
+If an operation fails, its database changes are rolled back.
+
+### Double-Entry Ledger
+
+Financial movements are recorded as balanced ledger entries.
+
+For example, funding a customer account with EUR 100 creates:
+
+| Account | Amount |
+|---|---:|
+| Internal system account | -10000 cents |
+| Customer account | +10000 cents |
+| **Total** | **0 cents** |
+
+The fundamental ledger invariant is:
+
+```text
+SUM(ledger_entries.amount_cents) = 0
+```
+
+for each financial transaction.
+
+Existing ledger entries are protected against modification by database triggers.
+
+### Concurrency Safety
+
+Account rows involved in financial operations are locked using PostgreSQL row-level locks.
+
+When multiple accounts are involved, locks are acquired in ascending account-ID order to reduce deadlock risk.
+
+This prevents concurrent operations from independently spending the same available balance.
+
+### Idempotency
+
+Financial write requests use the `Idempotency-Key` header.
+
+- Repeating an operation with the same key and payload returns its stored result without executing the financial movement again.
+- Reusing the same key with a different request produces `409 Conflict`.
+- Idempotency records and financial changes are persisted in the same database transaction.
+
+This protects against duplicate execution caused by client retries or network failures.
+
+### Money Representation
+
+Money is represented using signed `int64` cents in Go and `BIGINT` in PostgreSQL.
+
+Floating-point arithmetic is not used for financial amounts.
+
+Customer account balances cannot become negative. The internal system funding account may have a negative balance.
+
+## Testing
+
+The project uses Go's standard `testing` package.
+
+Tests cover API validation, persistence, financial operations, idempotency, concurrency, and integration with PostgreSQL.
+
+### Test Database
+
+Integration tests use a dedicated `bank_api_test` database.
+
+Start PostgreSQL:
+
+```bash
+docker compose up -d
+```
+
+Create the test database if it does not already exist:
+
+```bash
+docker compose exec -T postgres \
+  psql -U bank -d bank_api \
+  -c 'CREATE DATABASE bank_api_test;'
+```
+
+Configure the test connection:
+
+```bash
+export TEST_DATABASE_URL='postgres://bank:bank_dev_password@127.0.0.1:5433/bank_api_test?sslmode=disable'
+```
+
+For the full test suite, point `DATABASE_URL` to the same dedicated test database because some tests use that variable:
+
+```bash
+export DATABASE_URL="$TEST_DATABASE_URL"
+```
+
+**Never point test environment variables at a production database.**
+
+Integration tests use isolated PostgreSQL schemas to avoid interfering with application data.
+
+### Run Tests
+
+```bash
+go test ./... -count=1
+```
+
+With the race detector:
+
+```bash
+go test -race ./... -count=1
+```
+
+Static analysis:
+
+```bash
+go vet ./...
+```
 
 ## API Documentation
 
-The application serves a bundled **OpenAPI 3.0.3** specification and **Swagger UI**:
+Interactive Swagger UI:
 
-| URL | Description |
-|---|---|
-| `http://localhost:8080/swagger` | Interactive documentation |
-| `http://localhost:8080/openapi.yaml` | Standalone bundled OpenAPI document |
+```text
+http://localhost:8080/swagger
+```
 
-The source specification is organized under `api/openapi.yaml`, `api/paths/`, and `api/schemas/`, with external `$ref` references. `api/openapi.bundle.yaml` is generated and embedded into the Go binary.
+Bundled OpenAPI specification:
 
-### Regenerate the OpenAPI Bundle
+```text
+http://localhost:8080/openapi.yaml
+```
 
-The OpenAPI specification is maintained in modular YAML files under `api/`.
+The OpenAPI source is organized into modular files:
 
-The bundled specification (`api/openapi.bundle.yaml`) is committed to Git and embedded in the Go application using `go:embed`. **Redocly is not required to run the application or view the API documentation.**
+```text
+api/
+├── openapi.yaml
+├── openapi.bundle.yaml
+├── paths/
+├── schemas/
+└── swagger/
+```
 
-After modifying the OpenAPI source files, regenerate the bundle using Docker:
+The generated bundle is committed to the repository and embedded into the Go application.
+
+To regenerate it after changing the source specification:
 
 ```bash
 docker run --rm \
@@ -357,135 +354,53 @@ docker run --rm \
   --output api/openapi.bundle.yaml
 ```
 
-Commit the generated bundle alongside the updated source files.
+Swagger UI loads frontend assets from a CDN and requires internet access to render.
 
-Swagger UI is available at `http://localhost:8080/swagger`, and the bundled OpenAPI specification is available at `http://localhost:8080/openapi.yaml`.
+## Architecture
 
-Swagger UI loads JavaScript and CSS from a CDN, so an internet connection is required to render the interface.
+The application separates HTTP transport, banking services, persistence, and infrastructure concerns.
 
-## Testing
+The main packages include:
 
-The project uses Go's standard `testing` package. Tests cover HTTP validation, repository behavior, account-creation service behavior, idempotency, ledger posting, concurrent requests, and documentation endpoints.
+| Package | Responsibility |
+|---|---|
+| `cmd/api` | Application entry point and dependency wiring |
+| `api` | OpenAPI specification and Swagger UI |
+| `internal/banking` | Banking business operations and HTTP handlers |
+| `internal/account` | Account model and persistence |
+| `internal/ledger` | Double-entry ledger persistence |
+| `internal/transaction` | Financial transaction and idempotency persistence |
+| `internal/reconciliation` | Read-only financial consistency checks |
+| `internal/platform` | Database and HTTP infrastructure |
+| `migrations` | PostgreSQL schema migrations |
 
-### 1. Start the Test Database
+Business logic is coordinated by services, while repositories encapsulate database operations.
 
-The integration tests **require `TEST_DATABASE_URL`**. They intentionally do not fall back to `DATABASE_URL`, to avoid running database tests against the development database.
+## Design Decisions and Trade-offs
 
-Start PostgreSQL if it is not already running:
+**PostgreSQL transactions over distributed coordination.** The application uses a single transactional database to provide strong consistency without introducing message brokers, distributed transactions, or additional infrastructure.
 
-```bash
-docker compose up -d
-```
+**Modular monolith over microservices.** The scope does not justify independently deployed services. A modular monolith keeps the implementation easier to run, test, and reason about.
 
-Load the application environment:
+**Integer cents over floating-point amounts.** This avoids floating-point precision problems in financial calculations.
 
-```bash
-set -a
-source .env
-set +a
-```
+**Persisted account balances with a ledger.** Account balances provide efficient reads, while immutable ledger entries provide an auditable record of financial movements. Reconciliation can detect inconsistencies between the two.
 
-For the supplied local development configuration, use:
+**Synchronous operations.** Financial writes are completed within the HTTP request. Background processing and asynchronous workflows are intentionally outside the scope.
 
-```bash
-export TEST_DATABASE_URL='postgres://bank:bank_dev_password@127.0.0.1:5433/bank_api_test?sslmode=disable'
-```
+**Reconciliation is diagnostic.** The reconciliation endpoint detects discrepancies but does not automatically modify account balances or repair ledger entries.
 
-The test database `bank_api_test` must exist. If it has not been created yet, create it using the configured PostgreSQL superuser (the local Compose setup uses `bank`):
+### Possible Future Improvements
 
-```bash
-docker compose exec -T postgres psql -U bank -d bank_api -c 'CREATE DATABASE bank_api_test;'
-```
+- Authentication and authorization.
+- Pagination and filtering for transaction history.
+- Metrics and observability.
+- Additional reconciliation coverage and operational tooling.
 
-**Note:** The `postgres` service name in the command above assumes that the Compose service is named `postgres`. If your `docker-compose.yml` uses another service name, substitute it (check `docker compose ps`). If your Linux user cannot access the Docker socket, prefix Docker commands with `sudo` or configure Docker access appropriately.
-
-**Safety:** Never point `TEST_DATABASE_URL` at a development database containing valuable data, or at a production database.
-
-### 2. Run All Tests
-
-```bash
-go test ./... -count=1
-```
-
-Run with the race detector:
-
-```bash
-go test -race ./... -count=1
-```
-
-Run static analysis:
-
-```bash
-go vet ./...
-```
-
-### 3. Run Focused Tests
-
-HTTP account handler tests (no PostgreSQL required):
-
-```bash
-go test ./internal/account -run '^TestHTTPHandler_' -v -count=1
-```
-
-Documentation endpoint tests:
-
-```bash
-go test ./api/... -v
-```
-
-Account service integration tests (require `TEST_DATABASE_URL`):
-
-```bash
-go test ./internal/account -run '^TestPostgresService_' -v -count=1
-```
-
-### Test Isolation
-
-Integration tests connect to the dedicated `bank_api_test` database. Each test creates a uniquely named PostgreSQL schema, applies the Goose migrations inside it, and drops the schema during cleanup. This allows independent test execution without modifying application data in `bank_api`.
-
-The integration tests cover successful account creation, optional funding, invalid requests, idempotency replay and conflicts, concurrent use of the same key, and concurrent funding from the shared system account.
-
-### Manual Financial Integrity Check
-
-After creating an account with a positive initial balance, inspect its ledger entries in PostgreSQL:
-
-```sql
-SELECT
-    t.id AS transaction_id,
-    t.idempotency_key,
-    le.account_id,
-    a.account_type,
-    le.amount_cents
-FROM transactions t
-JOIN ledger_entries le ON le.transaction_id = t.id
-JOIN accounts a ON a.id = le.account_id
-WHERE t.idempotency_key = 'create-account-demo-001'
-ORDER BY le.account_id;
-```
-
-A correctly funded account has one negative system entry and one equal positive customer entry. Verify their sum:
-
-```sql
-SELECT
-    t.id AS transaction_id,
-    COUNT(le.id) AS entries_count,
-    SUM(le.amount_cents) AS total_cents
-FROM transactions t
-JOIN ledger_entries le ON le.transaction_id = t.id
-WHERE t.idempotency_key = 'create-account-demo-001'
-GROUP BY t.id;
-```
-
-Expected for a positive initial balance: `entries_count = 2` and `total_cents = 0`.
+These improvements are intentionally deferred to keep the take-home implementation focused on the requested banking operations and their correctness.
 
 ## Development Approach
 
-Features are developed incrementally, with an emphasis on:
+The implementation prioritizes correctness and clarity over unnecessary complexity.
 
-1. Defining the API contract and financial invariants.
-2. Implementing business logic and persistence behind clear interfaces.
-3. Writing unit, integration, and concurrency tests.
-4. Updating OpenAPI documentation and regenerating the bundle.
-5. Updating the README and making focused Git commits.
-
-The priority is a reliable and maintainable banking API rather than unnecessary infrastructure complexity.
+The core approach is to define financial invariants, implement transactional business operations, verify behavior through tests, and document architectural decisions and trade-offs.
