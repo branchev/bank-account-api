@@ -2,6 +2,7 @@ package transaction
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
@@ -13,6 +14,48 @@ type PostgresRepository struct{}
 // NewPostgresRepository creates a PostgreSQL transaction repository.
 func NewPostgresRepository() *PostgresRepository {
 	return &PostgresRepository{}
+}
+
+// TryCreate atomically attempts to reserve an idempotency key.
+//
+// If another transaction is inserting the same key, PostgreSQL waits
+// for that transaction to commit or roll back before resolving the
+// unique constraint.
+//
+// A conflict is not treated as an SQL error.
+func (r *PostgresRepository) TryCreate(
+	ctx context.Context,
+	tx pgx.Tx,
+	transaction *Transaction,
+) (bool, error) {
+	const query = `
+		INSERT INTO transactions (
+			transaction_type,
+			idempotency_key,
+			request_hash
+		)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (idempotency_key) DO NOTHING
+		RETURNING id
+	`
+
+	err := tx.QueryRow(
+		ctx,
+		query,
+		transaction.Type,
+		transaction.IdempotencyKey,
+		transaction.RequestHash,
+	).Scan(&transaction.ID)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+
+	if err != nil {
+		return false, fmt.Errorf("reserve idempotency key: %w", err)
+	}
+
+	return true, nil
 }
 
 // Create inserts a new financial transaction.
@@ -77,7 +120,10 @@ func (r *PostgresRepository) GetByIdempotencyKey(
 	)
 
 	if err != nil {
-		return nil, fmt.Errorf("get transaction by idempotency key: %w", err)
+		return nil, fmt.Errorf(
+			"get transaction by idempotency key: %w",
+			err,
+		)
 	}
 
 	return transaction, nil
