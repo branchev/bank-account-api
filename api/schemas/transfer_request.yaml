@@ -1,0 +1,27 @@
+type: object
+additionalProperties: false
+required:
+  - source_account_id
+  - destination_account_id
+  - amount_cents
+properties:
+  source_account_id:
+    type: integer
+    format: int64
+    minimum: 1
+    description: ID of the source customer account.
+    example: 1
+
+  destination_account_id:
+    type: integer
+    format: int64
+    minimum: 1
+    description: ID of the destination customer account.
+    example: 2
+
+  amount_cents:
+    type: integer
+    format: int64
+    minimum: 1
+    description: Amount to transfer in EUR cents.
+    example: 3000

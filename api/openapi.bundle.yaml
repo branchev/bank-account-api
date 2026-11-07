@@ -129,6 +129,54 @@ paths:
           description: Account balance overflow or underflow.
         '500':
           description: Internal server error.
+  /api/v1/transfers:
+    post:
+      tags:
+        - Transfers
+      summary: Transfer funds between accounts
+      description: |
+        Transfers funds between two customer accounts atomically.
+
+        The operation creates two balanced ledger entries and updates
+        both account balances within a single database transaction.
+
+        An Idempotency-Key header is required. Repeating the same request
+        with the same key returns the previously stored successful response
+        without executing the transfer again.
+
+        Reusing the key with different request parameters returns HTTP 409.
+      operationId: transferFunds
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: Unique key identifying this transfer request.
+          schema:
+            type: string
+            minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/transfer_request'
+      responses:
+        '200':
+          description: Transfer completed successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/transfer_response'
+        '400':
+          description: Invalid request body, account IDs, amount, or missing idempotency key.
+        '404':
+          description: Source or destination account not found.
+        '409':
+          description: Idempotency key already used with different request parameters.
+        '422':
+          description: Insufficient funds or balance arithmetic constraint violation.
+        '500':
+          description: Internal server error.
 components:
   schemas:
     create_account_request:
@@ -183,3 +231,59 @@ components:
           description: Amount to deposit, expressed in euro cents.
           example: 5000
       additionalProperties: false
+    transfer_request:
+      type: object
+      additionalProperties: false
+      required:
+        - source_account_id
+        - destination_account_id
+        - amount_cents
+      properties:
+        source_account_id:
+          type: integer
+          format: int64
+          minimum: 1
+          description: ID of the source customer account.
+          example: 1
+        destination_account_id:
+          type: integer
+          format: int64
+          minimum: 1
+          description: ID of the destination customer account.
+          example: 2
+        amount_cents:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Amount to transfer in EUR cents.
+          example: 3000
+    transfer_response:
+      type: object
+      required:
+        - transaction_id
+        - source_account_id
+        - destination_account_id
+        - amount_cents
+        - destination_balance_cents
+      properties:
+        transaction_id:
+          type: integer
+          format: int64
+          example: 42
+        source_account_id:
+          type: integer
+          format: int64
+          example: 1
+        destination_account_id:
+          type: integer
+          format: int64
+          example: 2
+        amount_cents:
+          type: integer
+          format: int64
+          example: 3000
+        destination_balance_cents:
+          type: integer
+          format: int64
+          description: Destination account balance after the transfer.
+          example: 5000

@@ -43,6 +43,11 @@ func (h *HTTPHandler) RegisterRoutes(mux *http.ServeMux) {
 		"POST /api/v1/accounts/{id}/deposits",
 		h.Deposit,
 	)
+
+	mux.HandleFunc(
+		"POST /api/v1/transfers",
+		h.Transfer,
+	)
 }
 
 type accountHTTPErrorResponse struct {
@@ -309,6 +314,159 @@ func (h *HTTPHandler) Deposit(
 			writeAccountError(w, http.StatusConflict, err.Error())
 
 		case errors.Is(err, ErrBalanceOverflow),
+			errors.Is(err, ErrBalanceUnderflow):
+			writeAccountError(w, http.StatusUnprocessableEntity, err.Error())
+
+		default:
+			writeAccountError(
+				w,
+				http.StatusInternalServerError,
+				"Internal server error",
+			)
+		}
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(result.StatusCode)
+
+	_, _ = w.Write(result.Body)
+}
+
+// Transfer handles POST /api/v1/transfers.
+func (h *HTTPHandler) Transfer(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
+	// Validate idempotency key.
+	idempotencyKey := strings.TrimSpace(
+		r.Header.Get("Idempotency-Key"),
+	)
+	if idempotencyKey == "" {
+		writeAccountError(
+			w,
+			http.StatusBadRequest,
+			"Idempotency-Key header is required",
+		)
+		return
+	}
+
+	// Limit request body size.
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodyBytes)
+
+	var raw json.RawMessage
+	decoder := json.NewDecoder(r.Body)
+
+	if err := decoder.Decode(&raw); err != nil {
+		writeAccountError(
+			w,
+			http.StatusBadRequest,
+			"Invalid JSON request body",
+		)
+		return
+	}
+
+	// Only JSON objects are accepted.
+	if len(raw) == 0 || raw[0] != '{' {
+		writeAccountError(
+			w,
+			http.StatusBadRequest,
+			"Request body must be a JSON object",
+		)
+		return
+	}
+
+	// Reject multiple JSON values.
+	var extra any
+	if err := decoder.Decode(&extra); err != io.EOF {
+		writeAccountError(
+			w,
+			http.StatusBadRequest,
+			"Request body must contain exactly one JSON object",
+		)
+		return
+	}
+
+	// Pointers distinguish missing fields from explicit zero values.
+	var payload struct {
+		SourceAccountID      *int64 `json:"source_account_id"`
+		DestinationAccountID *int64 `json:"destination_account_id"`
+		AmountCents          *int64 `json:"amount_cents"`
+	}
+
+	payloadDecoder := json.NewDecoder(bytes.NewReader(raw))
+	payloadDecoder.DisallowUnknownFields()
+
+	if err := payloadDecoder.Decode(&payload); err != nil {
+		writeAccountError(
+			w,
+			http.StatusBadRequest,
+			"Invalid JSON request body",
+		)
+		return
+	}
+
+	if payload.SourceAccountID == nil || *payload.SourceAccountID <= 0 {
+		writeAccountError(
+			w,
+			http.StatusBadRequest,
+			"Invalid source account ID",
+		)
+		return
+	}
+
+	if payload.DestinationAccountID == nil || *payload.DestinationAccountID <= 0 {
+		writeAccountError(
+			w,
+			http.StatusBadRequest,
+			"Invalid destination account ID",
+		)
+		return
+	}
+
+	if *payload.SourceAccountID == *payload.DestinationAccountID {
+		writeAccountError(
+			w,
+			http.StatusBadRequest,
+			ErrSameAccount.Error(),
+		)
+		return
+	}
+
+	if payload.AmountCents == nil || *payload.AmountCents <= 0 {
+		writeAccountError(
+			w,
+			http.StatusBadRequest,
+			ErrInvalidTransferAmount.Error(),
+		)
+		return
+	}
+
+	result, err := h.service.Transfer(
+		r.Context(),
+		TransferRequest{
+			SourceAccountID:      *payload.SourceAccountID,
+			DestinationAccountID: *payload.DestinationAccountID,
+			AmountCents:          *payload.AmountCents,
+			IdempotencyKey:       idempotencyKey,
+		},
+	)
+
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrMissingIdempotencyKey),
+			errors.Is(err, ErrInvalidTransferAmount),
+			errors.Is(err, ErrSameAccount):
+			writeAccountError(w, http.StatusBadRequest, err.Error())
+
+		case errors.Is(err, pgx.ErrNoRows):
+			writeAccountError(w, http.StatusNotFound, "Account not found")
+
+		case errors.Is(err, transaction.ErrIdempotencyConflict):
+			writeAccountError(w, http.StatusConflict, err.Error())
+
+		case errors.Is(err, ErrInsufficientFunds),
+			errors.Is(err, ErrBalanceOverflow),
 			errors.Is(err, ErrBalanceUnderflow):
 			writeAccountError(w, http.StatusUnprocessableEntity, err.Error())
 

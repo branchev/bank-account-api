@@ -1,37 +1,36 @@
-
 package database
 
 import (
-    "context"
-    "fmt"
-    "time"
+	"context"
+	"fmt"
+	"time"
 
-    "github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func NewPool(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
-    config, err := pgxpool.ParseConfig(databaseURL)
-    if err != nil {
-        return nil, fmt.Errorf("parse database config: %w", err)
-    }
+	config, err := pgxpool.ParseConfig(databaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("parse database config: %w", err)
+	}
 
-    config.MaxConns = 10
-    config.MinConns = 1
-    config.MaxConnLifetime = time.Hour
-    config.MaxConnIdleTime = 30 * time.Minute
+	config.MaxConns = 10
+	config.MinConns = 1
+	config.MaxConnLifetime = time.Hour
+	config.MaxConnIdleTime = 30 * time.Minute
 
-    pool, err := pgxpool.NewWithConfig(ctx, config)
-    if err != nil {
-        return nil, fmt.Errorf("create database pool: %w", err)
-    }
+	pool, err := pgxpool.NewWithConfig(ctx, config)
+	if err != nil {
+		return nil, fmt.Errorf("create database pool: %w", err)
+	}
 
-    pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-    defer cancel()
+	pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
 
-    if err := pool.Ping(pingCtx); err != nil {
-        pool.Close()
-        return nil, fmt.Errorf("ping database: %w", err)
-    }
+	if err := pool.Ping(pingCtx); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("ping database: %w", err)
+	}
 
-    return pool, nil
+	return pool, nil
 }

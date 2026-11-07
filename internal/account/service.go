@@ -17,6 +17,10 @@ var (
 	ErrInvalidDepositAmount = errors.New(
 		"deposit amount must be positive",
 	)
+
+	ErrInvalidTransferAmount = errors.New(
+		"transfer amount must be positive",
+	)
 )
 
 // CreateAccountRequest contains the data needed to open a new account.
@@ -64,4 +68,22 @@ type Service interface {
 		ctx context.Context,
 		request DepositRequest,
 	) (DepositResult, error)
+
+	Transfer(
+		ctx context.Context,
+		request TransferRequest,
+	) (TransferResult, error)
+}
+
+type TransferRequest struct {
+	SourceAccountID      int64
+	DestinationAccountID int64
+	AmountCents          int64
+	IdempotencyKey       string
+}
+
+type TransferResult struct {
+	StatusCode int
+	Body       []byte
+	Replay     bool
 }

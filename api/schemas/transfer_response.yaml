@@ -1,0 +1,33 @@
+type: object
+required:
+  - transaction_id
+  - source_account_id
+  - destination_account_id
+  - amount_cents
+  - destination_balance_cents
+properties:
+  transaction_id:
+    type: integer
+    format: int64
+    example: 42
+
+  source_account_id:
+    type: integer
+    format: int64
+    example: 1
+
+  destination_account_id:
+    type: integer
+    format: int64
+    example: 2
+
+  amount_cents:
+    type: integer
+    format: int64
+    example: 3000
+
+  destination_balance_cents:
+    type: integer
+    format: int64
+    description: Destination account balance after the transfer.
+    example: 5000
