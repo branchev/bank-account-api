@@ -15,6 +15,7 @@ import (
 	"github.com/branchev/bank-account-api/internal/banking"
 	"github.com/branchev/bank-account-api/internal/ledger"
 	"github.com/branchev/bank-account-api/internal/platform/database"
+	"github.com/branchev/bank-account-api/internal/platform/httpmiddleware"
 	"github.com/branchev/bank-account-api/internal/transaction"
 )
 
@@ -73,7 +74,7 @@ func main() {
 
 	server := &http.Server{
 		Addr:              ":" + port,
-		Handler:           mux,
+		Handler:           httpmiddleware.RequestLogger(mux),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 

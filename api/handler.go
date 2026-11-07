@@ -11,6 +11,10 @@ var documentation embed.FS
 func RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /openapi.yaml", serveOpenAPI)
 	mux.HandleFunc("GET /swagger", serveSwaggerUI)
+
+	mux.HandleFunc("GET /swagger/", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/swagger", http.StatusMovedPermanently)
+	})
 }
 
 func serveOpenAPI(w http.ResponseWriter, r *http.Request) {
