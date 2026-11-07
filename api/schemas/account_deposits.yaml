@@ -1,0 +1,68 @@
+post:
+  tags:
+    - Accounts
+  summary: Deposit funds into a bank account
+  description: |
+    Deposits funds into an existing EUR customer account.
+
+    Funds are transferred from the internal system account
+    to the destination customer account.
+
+    The operation is atomic and idempotent. Each successful
+    deposit creates two balanced double-entry ledger entries.
+
+    Repeating the same request with the same Idempotency-Key
+    returns the stored result without depositing funds again.
+
+  operationId: depositFunds
+
+  parameters:
+    - name: id
+      in: path
+      required: true
+      description: Destination customer account ID.
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+
+    - name: Idempotency-Key
+      in: header
+      required: true
+      description: |
+        Unique key identifying the deposit operation.
+        Reusing the key with a different account or amount
+        results in HTTP 409.
+      schema:
+        type: string
+        minLength: 1
+
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: "../schemas/deposit_request.yaml"
+
+  responses:
+    '200':
+      description: Deposit completed successfully or replayed.
+      content:
+        application/json:
+          schema:
+            $ref: "../schemas/account.yaml"
+
+    '400':
+      description: Invalid account ID, amount, JSON payload, or missing Idempotency-Key.
+
+    '404':
+      description: Destination customer account not found.
+
+    '409':
+      description: Idempotency-Key reused with different request parameters.
+
+    '422':
+      description: Deposit would cause an account balance overflow or underflow.
+
+    '500':
+      description: Internal server error.

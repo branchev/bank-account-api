@@ -342,18 +342,26 @@ The source specification is organized under `api/openapi.yaml`, `api/paths/`, an
 
 ### Regenerate the OpenAPI Bundle
 
-After modifying the source specification:
+The OpenAPI specification is maintained in modular YAML files under `api/`.
+
+The bundled specification (`api/openapi.bundle.yaml`) is committed to Git and embedded in the Go application using `go:embed`. **Redocly is not required to run the application or view the API documentation.**
+
+After modifying the OpenAPI source files, regenerate the bundle using Docker:
 
 ```bash
-$(go env GOPATH)/bin/vacuum bundle \
-  --base ./api \
-  api/openapi.yaml \
-  api/openapi.bundle.yaml
+docker run --rm \
+  -v "$(pwd):/work" \
+  -w /work \
+  redocly/cli:latest \
+  bundle api/openapi.yaml \
+  --output api/openapi.bundle.yaml
 ```
 
-Commit the updated bundle along with the source YAML changes. The bundled documentation currently needs to be updated to cover the newly implemented account-creation endpoint; the runtime endpoint is available independently of that documentation update.
+Commit the generated bundle alongside the updated source files.
 
-Swagger UI currently loads JavaScript and CSS from a CDN, so an internet connection is needed to render the interface.
+Swagger UI is available at `http://localhost:8080/swagger`, and the bundled OpenAPI specification is available at `http://localhost:8080/openapi.yaml`.
+
+Swagger UI loads JavaScript and CSS from a CDN, so an internet connection is required to render the interface.
 
 ## Testing
 

@@ -1,110 +1,185 @@
 openapi: 3.0.3
 info:
-    title: Bank Account API
-    version: 1.0.0
-    description: |
-        REST API for managing bank accounts and financial transactions.
+  title: Bank Account API
+  version: 1.0.0
+  description: |
+    REST API for managing bank accounts and financial transactions.
 
-        The API follows a modular monolith architecture.
-        Financial operations will support atomicity, concurrency safety,
-        and idempotency.
+    The API follows a modular monolith architecture.
+    Financial operations will support atomicity, concurrency safety,
+    and idempotency.
 servers:
-    - url: http://localhost:8080
-      description: Local development server
+  - url: http://localhost:8080
+    description: Local development server
 tags:
-    - name: Health
-      description: Application health checks
-    - name: Accounts
-      description: Bank account management
+  - name: Health
+    description: Application health checks
+  - name: Accounts
+    description: Bank account management
 paths:
-    /health:
-        get:
-            tags:
-                - Health
-            summary: Check API availability
-            operationId: getHealth
-            responses:
-                '200':
-                    description: API is running
-                    content:
-                        text/plain:
-                            schema:
-                                type: string
-                                example: OK
-    /api/v1/accounts:
-        post:
-            tags:
-                - Accounts
-            summary: Create a bank account
-            description: |
-                Creates a new EUR bank account.
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Check API availability
+      operationId: getHealth
+      responses:
+        '200':
+          description: API is running
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: OK
+  /api/v1/accounts:
+    post:
+      tags:
+        - Accounts
+      summary: Create a bank account
+      description: |
+        Creates a new EUR bank account.
 
-                The initial balance defaults to zero when omitted.
-                A positive initial balance is funded through the internal
-                system account and recorded in the double-entry ledger.
+        The initial balance defaults to zero when omitted.
+        A positive initial balance is funded through the internal
+        system account and recorded in the double-entry ledger.
 
-                The operation is atomic and idempotent.
-            operationId: createAccount
-            parameters:
-                - name: Idempotency-Key
-                  in: header
-                  required: true
-                  description: |
-                    Unique key identifying the account creation request.
-                    Repeating the same request with the same key returns
-                    the original result without creating another account.
-                  schema:
-                    type: string
-                    minLength: 1
-            requestBody:
-                required: true
-                content:
-                    application/json:
-                        schema:
-                            type: object
-                            description: Request payload for creating a bank account.
-                            properties:
-                                initial_balance_cents:
-                                    type: integer
-                                    format: int64
-                                    minimum: 0
-                                    default: 0
-                                    example: 10000
-                                    description: |
-                                        Initial account balance in euro cents.
-                                        Defaults to zero when omitted.
-                            additionalProperties: false
-            responses:
-                '201':
-                    description: Bank account created successfully.
-                    content:
-                        application/json:
-                            schema:
-                                type: object
-                                description: A bank account with its current balance.
-                                required:
-                                    - id
-                                    - currency
-                                    - balance_cents
-                                properties:
-                                    id:
-                                        type: integer
-                                        format: int64
-                                        example: 2
-                                        description: Unique account identifier.
-                                    currency:
-                                        type: string
-                                        enum:
-                                            - EUR
-                                        example: EUR
-                                        description: Account currency.
-                                    balance_cents:
-                                        type: integer
-                                        format: int64
-                                        minimum: 0
-                                        example: 10000
-                                        description: Current account balance in euro cents.
-                '400':
-                    description: Invalid request payload or missing Idempotency-Key.
-                '409':
-                    description: Idempotency-Key reused with a different request.
+        The operation is atomic and idempotent.
+      operationId: createAccount
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: |
+            Unique key identifying the account creation request.
+            Repeating the same request with the same key returns
+            the original result without creating another account.
+          schema:
+            type: string
+            minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/create_account_request'
+      responses:
+        '201':
+          description: Bank account created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/account'
+        '400':
+          description: Invalid request payload or missing Idempotency-Key.
+        '409':
+          description: Idempotency-Key reused with a different request.
+  /api/v1/accounts/{id}/deposits:
+    post:
+      tags:
+        - Accounts
+      summary: Deposit funds into a bank account
+      description: |
+        Deposits funds into an existing EUR customer account.
+
+        Funds are transferred from the internal system account
+        to the destination customer account.
+
+        The operation is atomic and idempotent.
+        Each successful deposit creates two balanced ledger entries.
+
+        Repeating the same request with the same Idempotency-Key
+        does not deposit funds again.
+      operationId: depositFunds
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Destination customer account ID.
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: Unique key identifying the deposit operation.
+          schema:
+            type: string
+            minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/deposit_request'
+      responses:
+        '200':
+          description: Deposit completed successfully or replayed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/account'
+        '400':
+          description: Invalid request parameters or missing Idempotency-Key.
+        '404':
+          description: Customer account not found.
+        '409':
+          description: Idempotency-Key reused with different parameters.
+        '422':
+          description: Account balance overflow or underflow.
+        '500':
+          description: Internal server error.
+components:
+  schemas:
+    create_account_request:
+      type: object
+      description: Request payload for creating a bank account.
+      properties:
+        initial_balance_cents:
+          type: integer
+          format: int64
+          minimum: 0
+          default: 0
+          example: 10000
+          description: |
+            Initial account balance in euro cents.
+            Defaults to zero when omitted.
+      additionalProperties: false
+    account:
+      type: object
+      description: A bank account with its current balance.
+      required:
+        - id
+        - currency
+        - balance_cents
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 2
+          description: Unique account identifier.
+        currency:
+          type: string
+          enum:
+            - EUR
+          example: EUR
+          description: Account currency.
+        balance_cents:
+          type: integer
+          format: int64
+          minimum: 0
+          example: 10000
+          description: Current account balance in euro cents.
+    deposit_request:
+      type: object
+      description: Request to deposit funds into an existing bank account.
+      required:
+        - amount_cents
+      properties:
+        amount_cents:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Amount to deposit, expressed in euro cents.
+          example: 5000
+      additionalProperties: false

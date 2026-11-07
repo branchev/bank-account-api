@@ -27,3 +27,6 @@ paths:
 
   /api/v1/accounts:
     $ref: "./paths/accounts.yaml"
+  
+  /api/v1/accounts/{id}/deposits:
+    $ref: "./paths/account_deposits.yaml"

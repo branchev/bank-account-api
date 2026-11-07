@@ -1,0 +1,12 @@
+type: object
+description: Request to deposit funds into an existing bank account.
+required:
+  - amount_cents
+properties:
+  amount_cents:
+    type: integer
+    format: int64
+    minimum: 1
+    description: Amount to deposit, expressed in euro cents.
+    example: 5000
+additionalProperties: false
