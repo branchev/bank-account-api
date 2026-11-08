@@ -11,7 +11,7 @@ info:
     Financial operations support atomicity, concurrency safety, and idempotency.
 
 servers:
-  - url: http://localhost:8080
+  - url: /
     description: Local development server
 
 tags:

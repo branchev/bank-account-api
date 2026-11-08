@@ -356,6 +356,18 @@ docker run --rm \
 
 Swagger UI loads frontend assets from a CDN and requires internet access to render.
 
+The OpenAPI specification uses a relative server URL (`/`), allowing Swagger UI to send requests to the same host and port serving the application.
+
+**Important:** `api/openapi.bundle.yaml` is generated from the modular OpenAPI source files and embedded into the Go binary at build time.
+
+After modifying the OpenAPI specification:
+
+1. Regenerate `api/openapi.bundle.yaml` using the command above.
+2. Restart the Go application (`go run ./cmd/api`).
+3. Refresh Swagger UI in the browser.
+
+Always commit the generated bundle together with the corresponding OpenAPI source changes. Regenerating the bundle is only necessary when the OpenAPI specification changes.
+
 ## Architecture
 
 The application separates HTTP transport, banking services, persistence, and infrastructure concerns.
